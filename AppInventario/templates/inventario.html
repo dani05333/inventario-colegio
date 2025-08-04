@@ -1,0 +1,103 @@
+{% extends 'inicio.html' %}
+{% block content %}
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between mb-3">
+        <h2>Inventario</h2>
+        <a href="{% url 'crear_inventario' %}" class="btn btn-success">Agregar Inventario</a>
+    </div>
+
+    <table id="tabla-inventario" class="table table-striped" style="width:100%">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Codigo Barras</th>
+            <th>Colegio</th>
+            <th>Uniforme</th>
+            <th>Talla</th>
+            <th>Cantidad</th>
+            <th>Precio Unitario</th>
+            <th>Precio Total</th>
+            <th>Acciones</th>
+        </tr>
+        <tr>
+            <th></th> <!-- ID -->
+            <th></th> <!-- ID -->
+            <th><select class="form-select form-select-sm filter-col" data-column="2"><option value="">Todos</option></select></th>
+            <th><select class="form-select form-select-sm filter-col" data-column="3"><option value="">Todos</option></select></th>
+            <th><select class="form-select form-select-sm filter-col" data-column="4"><option value="">Todos</option></select></th>
+            <th></th> <!-- Cantidad -->
+            <th></th> <!-- Precio Unitario -->
+            <th></th> <!-- Precio Total -->
+            <th></th> <!-- Acciones -->
+        </tr>
+    </thead>
+</table>
+
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    $(document).ready(function() {
+        var table = $('#tabla-inventario').DataTable({
+            ajax: '{% url "inventario_json" %}',
+            language: {
+                url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json'
+            },
+            columns: [
+                { data: 'id' },
+                { data: 'codigo_barras' },
+                { data: 'colegio' },
+                { data: 'uniforme' },
+                { data: 'talla' },
+                { data: 'cantidad' },
+                { 
+                    data: 'precio_unitario',
+                    render: $.fn.dataTable.render.number( ',', '.', 2, '$' )
+                },
+                { 
+                    data: 'precio_total',
+                    render: $.fn.dataTable.render.number( ',', '.', 2, '$' )
+                },
+                { 
+                    data: 'id',
+                    render: function (data, type, row) {
+                        const editarUrl = "{% url 'editar_inventario' 0 %}".replace(0, data);
+                        const eliminarUrl = "{% url 'eliminar_inventario' 0 %}".replace(0, data);
+                        return `
+                            <a href="${editarUrl}" class="btn btn-warning btn-sm">Editar</a>
+                            <a href="${eliminarUrl}" class="btn btn-danger btn-sm">Eliminar</a>
+                        `;
+                    },
+                    orderable: false,
+                    searchable: false
+                }
+            ],
+            initComplete: function () {
+                this.api().columns([1,2,3,4]).every(function () {
+                    var column = this;
+                    var select = $('select[data-column="' + column.index() + '"]');
+
+                    column.data().unique().sort().each(function (d, j) {
+                        if (d != null && d != '') {
+                            select.append('<option value="'+d+'">'+d+'</option>')
+                        }
+                    });
+
+                    select.on('change', function () {
+                        var val = $.fn.dataTable.util.escapeRegex($(this).val());
+                        column.search(val ? '^'+val+'$' : '', true, false).draw();
+                    });
+                });
+            }
+        });
+        $('.filter-col').on('click', function(e) {
+    e.stopPropagation();
+});
+
+    });
+</script>
+
+{% endblock %}

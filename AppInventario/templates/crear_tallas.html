@@ -1,0 +1,22 @@
+{% extends 'inicio.html' %}
+{% block content %}
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Agregar Tallas</title>
+</head>
+<body>
+    <h1>Agregar Tallas</h1>
+    
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">{% if form.instance.pk %}Actualizar{% else %}Guardar{% endif %}</button>
+    </form>
+
+    <p><a href="{% url 'ver_tallas' %}">Volver a la lista de tallas</a></p>
+</body>
+</html>
+{% endblock %}

@@ -1,0 +1,64 @@
+{% extends 'inicio.html' %}
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between mb-3">
+        <h2>Uniformes</h2>
+        <a href="{% url 'crear_uniforme' %}" class="btn btn-success">Agregar Uniforme</a>
+    </div>
+
+    <table id="tabla-uniformes" class="table table-striped" style="width:100%">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Nombre</th>
+                <th>Editar</th>
+                <th>Eliminar</th>
+            </tr>
+        </thead>
+    </table>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<!-- DataTables JS -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+
+<script>
+    $(document).ready(function() {
+        $('#tabla-uniformes').DataTable({
+            ajax: '{% url "uniformes_json" %}', // URL que entrega el JSON
+            language: {
+                url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json'
+            },
+            columns: [
+                { data: 'id' },
+                { data: 'nombre' },
+                { 
+                    data: 'id',
+                    render: function (data, type, row) {
+                        const editarUrl = "{% url 'editar_uniforme' 0 %}".replace(0, data);
+                        return `
+                            <a href="${editarUrl}" class="btn btn-warning btn-sm">Editar</a>
+                        `;
+                    },
+                    orderable: false, // No permitir ordenar por acciones
+                    searchable: false // No buscar en esta columna
+                },
+                {
+                    data:'id',
+                    render: function (data, type, row){
+                        const eliminarUrl = "{% url 'eliminar_uniforme' 0 %}".replace(0, data);
+                        return `
+                            <a href="${eliminarUrl}" class="btn btn-danger btn-sm">Eliminar</a>
+                        `;
+                    },
+                    orderable: false, // No permitir ordenar por acciones
+                    searchable: false // No buscar en esta columna
+                }
+            ]
+        });
+    });
+</script>
+{% endblock %}

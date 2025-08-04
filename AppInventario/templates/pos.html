@@ -1,0 +1,258 @@
+{% extends 'inicio.html' %}
+
+{% block content %}
+<div class="container my-5">
+  <div class="row">
+    <!-- Panel Izquierdo: Escaneo y Carrito -->
+    <div class="col-md-8">
+      <div class="card shadow-sm mb-4">
+        <div class="card-body">
+          <div class="input-group input-group-lg">
+            <input type="text" id="codigo-barras" class="form-control shadow-sm" placeholder="Escanea o ingresa el código de barras" autofocus>
+            <button id="btn-agregar" class="btn btn-primary px-4">Agregar</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+          <h4 class="mb-0">Carrito de Compras</h4>
+          <button id="btn-vaciar" class="btn btn-sm btn-outline-danger">Vaciar</button>
+        </div>
+        <div class="card-body p-0">
+          <table class="table table-striped mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Producto</th>
+                <th>Talla</th>
+                <th>Cantidad</th>
+                <th>Precio</th>
+                <th>Subtotal</th>
+                <th>Eliminar</th>
+              </tr>
+            </thead>
+            <tbody id="carrito-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel Derecho: Total y Vender -->
+    <div class="col-md-4">
+      <div class="card shadow-sm text-center mb-4">
+        <div class="card-body">
+          <h2 class="text-muted">Total</h2>
+          <h1 id="total" class="display-3 fw-bold">$0.00</h1>
+        </div>
+      </div>
+      <button id="btn-vender" class="btn btn-success btn-lg w-100 shadow-sm">VENDER</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de Alerta -->
+<div class="modal fade" id="alertModal" tabindex="-1" aria-labelledby="alertModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title" id="alertModalLabel">¡Atención!</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body" id="alertModalBody">
+        <!-- Aquí se cargará el mensaje -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Resumen de Venta -->
+<div class="modal fade" id="resumenVentaModal" tabindex="-1" aria-labelledby="resumenVentaLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="resumenVentaLabel">Resumen de Venta</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th>Talla</th>
+              <th>Cant.</th>
+              <th>Subtotal</th>
+            </tr>
+          </thead>
+          <tbody id="resumen-carrito-body"></tbody>
+        </table>
+        <h4 class="text-end">Total: <span id="resumen-total"></span></h4>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" id="btn-confirmar-venta" class="btn btn-success">Confirmar Venta</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+let carrito = [];
+
+// Buscar producto con Enter
+$('#codigo-barras').on('keypress', function(e){
+    if(e.which == 13){
+        buscarProducto();
+    }
+});
+
+// Buscar producto con botón
+$('#btn-agregar').on('click', function(){
+    buscarProducto();
+});
+
+function buscarProducto(){
+    let codigo = $('#codigo-barras').val();
+    if(codigo.trim() === ''){
+        mostrarAlerta('Ingrese un código de barras');
+        return;
+    }
+    $.ajax({
+        url: '{% url "buscar_producto" %}',
+        method: 'GET',
+        data: {codigo: codigo},
+        success: function(data){
+            if(data.found){
+                agregarAlCarrito(data.producto);
+            } else {
+                mostrarAlerta('Producto no encontrado');
+            }
+            $('#codigo-barras').val('').focus();
+        }
+    });
+}
+
+function agregarAlCarrito(producto){
+    let existente = carrito.find(p => p.id == producto.id);
+    if(existente){
+        existente.cantidad += 1;
+    } else {
+        carrito.push({...producto, cantidad: 1});
+    }
+    renderCarrito();
+}
+
+function renderCarrito(){
+    let total = 0;
+    $('#carrito-body').empty();
+    carrito.forEach((item, index) => {
+        let subtotal = item.precio * item.cantidad;
+        total += subtotal;
+        $('#carrito-body').append(`
+            <tr>
+                <td>${item.nombre}</td>
+                <td>${item.talla}</td>
+                <td>
+                  <input type="number" min="1" value="${item.cantidad}" class="form-control form-control-sm cantidad-input" data-index="${index}">
+                </td>
+                <td>$${item.precio.toFixed(0)}</td>
+                <td>$${subtotal.toFixed(0)}</td>
+                <td><button class="btn btn-sm btn-danger btn-eliminar" data-index="${index}">X</button></td>
+            </tr>
+        `);
+    });
+    $('#total').text('$' + total.toFixed(0));
+}
+
+$(document).on('change', '.cantidad-input', function(){
+    let index = $(this).data('index');
+    let nuevaCantidad = parseInt($(this).val());
+    if(nuevaCantidad > 0){
+        carrito[index].cantidad = nuevaCantidad;
+    } else {
+        carrito[index].cantidad = 1;
+        $(this).val(1);
+    }
+    renderCarrito();
+});
+
+$(document).on('click', '.btn-eliminar', function(){
+    let index = $(this).data('index');
+    carrito.splice(index, 1);
+    renderCarrito();
+});
+
+$('#btn-vaciar').on('click', function(){
+    if(confirm('¿Estás seguro de vaciar el carrito?')){
+        carrito = [];
+        renderCarrito();
+    }
+});
+
+// Vender: Mostrar Modal Resumen antes de enviar al backend
+$('#btn-vender').on('click', function(){
+    if(carrito.length === 0){
+        mostrarAlerta('No hay productos en el carrito');
+        return;
+    }
+
+    // Llenar resumen modal
+    let total = 0;
+    $('#resumen-carrito-body').empty();
+    carrito.forEach(item => {
+        let subtotal = item.precio * item.cantidad;
+        total += subtotal;
+        $('#resumen-carrito-body').append(`
+            <tr>
+                <td>${item.nombre}</td>
+                <td>${item.talla}</td>
+                <td>${item.cantidad}</td>
+                <td>$${subtotal.toFixed(0)}</td>
+            </tr>
+        `);
+    });
+    $('#resumen-total').text('$' + total.toFixed(0));
+
+    var resumenModal = new bootstrap.Modal(document.getElementById('resumenVentaModal'));
+    resumenModal.show();
+});
+
+// Confirmar Venta desde el Modal
+$('#btn-confirmar-venta').on('click', function(){
+    $.ajax({
+        url: '{% url "registrar_venta" %}',
+        method: 'POST',
+        contentType: 'application/json',
+        headers: {'X-CSRFToken': '{{ csrf_token }}'},
+        data: JSON.stringify({carrito: carrito}),
+        success: function(){
+            mostrarAlerta('Venta realizada con éxito', 'success');
+            carrito = [];
+            renderCarrito();
+            var resumenModal = bootstrap.Modal.getInstance(document.getElementById('resumenVentaModal'));
+            resumenModal.hide();
+        },
+        error: function(xhr){
+            if(xhr.status === 400){
+                const errorData = JSON.parse(xhr.responseText);
+                mostrarAlerta(errorData.message || 'No hay suficiente stock');
+            } else {
+                mostrarAlerta('Error inesperado al registrar la venta');
+            }
+        }
+    });
+});
+
+function mostrarAlerta(mensaje, tipo = 'danger'){
+    $('#alertModalBody').text(mensaje);
+    $('#alertModal .modal-header').removeClass('bg-danger bg-success').addClass(tipo === 'success' ? 'bg-success' : 'bg-danger');
+    var alertModal = new bootstrap.Modal(document.getElementById('alertModal'));
+    alertModal.show();
+}
+</script>
+{% endblock %}

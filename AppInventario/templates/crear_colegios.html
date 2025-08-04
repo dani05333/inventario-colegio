@@ -1,0 +1,22 @@
+{% extends 'inicio.html' %}
+{% block content %}
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Agregar Colegio</title>
+</head>
+<body>
+    <h1>Agregar Colegio</h1>
+    
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">{% if form.instance.pk %}Actualizar{% else %}Guardar{% endif %}</button>
+    </form>
+
+    <p><a href="{% url 'ver_colegios' %}">Volver a la lista de colegios</a></p>
+</body>
+</html>
+{% endblock %}

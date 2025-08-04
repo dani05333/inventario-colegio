@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Inventario de Uniformes</title>
+  
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+
+  <!-- DataTables CSS -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+
+  <style>
+    .sidebar {
+      min-height: 100vh;
+      background-color: #f8f9fa;
+      border-right: 1px solid #dee2e6;
+    }
+    .sidebar .nav-link {
+      color: #495057;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+    .sidebar .nav-link:hover {
+      background-color: #e9ecef;
+      color: #0d6efd;
+    }
+    .navbar {
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .card {
+      border-radius: 1rem;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+    }
+    .bg-gradient-primary {
+  background: linear-gradient(90deg, #6b6e68dc, #abb4a7);
+}
+.btn-gradient-primary:hover {
+  background: linear-gradient(90deg, #6b6e68dc, #abb4a7);
+}
+
+  </style>
+</head>
+<body>
+
+  <!-- Navbar superior -->
+  <nav class="navbar navbar-expand-lg navbar-light bg-white sticky-top">
+    <div class="container-fluid">
+      <span class="navbar-brand fw-bold">Inventario de Uniformes Escolares</span>
+    </div>
+  </nav>
+
+  <div class="container-fluid">
+    <div class="row">
+
+      <!-- Sidebar -->
+      <nav class="col-md-2 d-none d-md-block sidebar py-4">
+        <div class="position-sticky">
+          <ul class="nav flex-column">
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'dashboard_ventas' %}"><i class="bi bi-house me-2"></i>Inicio</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'punto_de_venta' %}"><i class="bi bi-cash me-2"></i>Punto de Venta</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'ver_inventario' %}"><i class="bi bi-box-seam me-2"></i>Inventario</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'historial_ventas' %}"><i class="bi bi-calendar2-week me-2"></i>Historial Ventas</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'ver_colegios' %}"><i class="bi bi-building me-2"></i>Colegios</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'ver_tallas' %}"><i class="bi bi-arrows-expand me-2"></i>Tallas</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{% url 'ver_uniformes' %}"><i class="bi bi-person-badge me-2"></i>Uniformes</a>
+            </li>
+            
+            
+            
+            
+          </ul>
+        </div>
+      </nav>
+
+      <!-- Contenido principal -->
+      <main class="col-md-10 ms-sm-auto px-md-4 py-4">
+        <div class="card">
+          <div class="card-body">
+            {% block content %}
+            <h3 class="card-title mb-3">Bienvenido/a</h3>
+            <p class="card-text">Selecciona una sección en el menú para comenzar a gestionar el inventario.</p>
+            {% endblock %}
+          </div>
+        </div>
+      </main>
+
+    </div>
+  </div>
+
+  <!-- jQuery y DataTables -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+
+  {% block extra_scripts %}
+  {% endblock %}
+
+</body>
+</html>

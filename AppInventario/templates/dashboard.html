@@ -1,0 +1,247 @@
+{% extends 'inicio.html' %}
+{% block content %}
+<div class="container my-5">
+    <h2 class="mb-4 text-center">📊 Analisis de Ventas</h2>
+
+    <!-- KPIs -->
+    <div class="row text-center mb-5">
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-lg rounded-4 border-0">
+                <div class="card-body bg-primary text-white rounded-4">
+                    <h6 class="fw-bold">Ventas Totales</h6>
+                    <h3 id="kpi-ventas" class="fw-bolder">$0</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-lg rounded-4 border-0">
+                <div class="card-body bg-success text-white rounded-4">
+                    <h6 class="fw-bold">Productos Vendidos</h6>
+                    <h3 id="kpi-productos" class="fw-bolder">0</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-lg rounded-4 border-0">
+                <div class="card-body bg-warning text-dark rounded-4">
+                    <h6 class="fw-bold">Producto más vendido</h6>
+                    <h5 id="kpi-top-producto" class="fw-bolder">N/A</h5>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-lg rounded-4 border-0">
+                <div class="card-body bg-danger text-white rounded-4">
+                    <h6 class="fw-bold">Ticket Promedio</h6>
+                    <h3 id="kpi-ticket" class="fw-bolder">$0</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="row align-items-end mb-5">
+        <div class="col-md-3 mb-2">
+            <label class="form-label fw-bold">Rango</label>
+            <select id="filtro-rango" class="form-select rounded-3 shadow-sm">
+                <option value="dia">Día</option>
+                <option value="semana">Semana</option>
+                <option value="mes">Mes</option>
+            </select>
+        </div>
+        <div class="col-md-3 mb-2">
+            <label class="form-label fw-bold">Desde</label>
+            <input type="date" id="fecha-inicio" class="form-control rounded-3 shadow-sm">
+        </div>
+        <div class="col-md-3 mb-2">
+            <label class="form-label fw-bold">Hasta</label>
+            <input type="date" id="fecha-fin" class="form-control rounded-3 shadow-sm">
+        </div>
+        <div class="col-md-3 mb-2">
+            <button id="btn-filtrar" class="btn btn-primary w-100 rounded-3 shadow">Filtrar</button>
+        </div>
+    </div>
+
+    <!-- Gráficos -->
+    <div class="row mb-5">
+        <div class="col-md-8 mb-4">
+            <div class="card shadow rounded-4">
+                <div class="card-body">
+                    <h6 class="fw-bold mb-3">Evolución de Ventas</h6>
+                    <canvas id="ventas-line-chart" height="180"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card shadow rounded-4">
+                <div class="card-body">
+                    <h6 class="fw-bold mb-3">Top Productos</h6>
+                    <canvas id="productos-torta-chart" height="220"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Secciones de Stock y Tendencias -->
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card shadow rounded-4">
+                <div class="card-header bg-danger text-white rounded-top-4">
+                    <h6 class="mb-0 fw-bold">⚠️ Productos con Stock Bajo</h6>
+                </div>
+                <div class="card-body">
+                    <ul id="lista-stock-bajo" class="list-group list-unstyled list-group-flush">
+                        <!-- JS insertará aquí -->
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-4">
+            <div class="card shadow rounded-4">
+                <div class="card-header bg-warning text-dark rounded-top-4">
+                    <h6 class="mb-0 fw-bold">📈 Productos en Tendencia</h6>
+                </div>
+                <div class="card-body">
+                    <ul id="lista-productos-tendencia" class="list-group list-unstyled list-group-flush">
+                        <!-- JS insertará aquí -->
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script>
+let lineChart;
+let tortaChart;
+
+function fetchVentasData(){
+    let inicio = $('#fecha-inicio').val();
+    let fin = $('#fecha-fin').val();
+    let rango = $('#filtro-rango').val();
+
+    if(rango === 'dia' && !inicio && !fin){
+        const hoy = new Date().toISOString().slice(0,10);
+        inicio = hoy;
+        fin = hoy;
+    }
+
+    $.ajax({
+        url: "{% url 'ventas_data' %}",
+        data: {inicio: inicio, fin: fin, rango: rango},
+        success: function(data){
+            renderLineChart(data.fechas, data.montos);
+            renderTortaChart(data.productos);
+
+            const totalVentas = data.total_ventas;
+            const totalProductos = data.productos.reduce((acc, p) => acc + p.cantidad, 0);
+            const topProducto = data.top_producto && data.top_producto.nombre !== 'N/A' 
+    ? `${data.top_producto.nombre} - ${data.top_producto.talla} - ${data.top_producto.colegio}` 
+    : 'N/A';
+            const ticketPromedio = (data.cantidad_ventas > 0) ? (totalVentas / data.cantidad_ventas).toFixed(0) : 0;
+
+            $('#kpi-ventas').text(`$${totalVentas.toLocaleString()}`);
+            $('#kpi-productos').text(totalProductos);
+            $('#kpi-top-producto').text(topProducto);
+            $('#kpi-ticket').text(`$${ticketPromedio}`);
+        }
+    });
+}
+
+function fetchStockBajo() {
+    $.ajax({
+        url: "{% url 'stock_bajo' %}",
+        success: function(data){
+            let html = '';
+            data.productos.forEach(p => {
+                html += `<li>${p.nombre} - ${p.talla} - ${p.colegio} (Stock: ${p.stock})</li>`;
+            });
+            $('#lista-stock-bajo').html(html || '<li>No hay productos con stock bajo</li>');
+        }
+    });
+}
+
+function fetchProductosTendencia() {
+    $.ajax({
+        url: "{% url 'productos_tendencia' %}",
+        success: function(data){
+            let html = '';
+            data.productos.forEach(p => {
+                html += `<li>${p.nombre} - ${p.talla} - ${p.colegio} (+${p.crecimiento} ventas)</li>`;
+            });
+            $('#lista-productos-tendencia').html(html || '<li>No hay productos en tendencia</li>');
+        }
+    });
+}
+
+function renderLineChart(labels, dataPoints){
+    if(lineChart){ lineChart.destroy(); }
+    const ctx = document.getElementById('ventas-line-chart').getContext('2d');
+    lineChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Ventas ($)',
+                data: dataPoints,
+                backgroundColor: 'rgba(75, 192, 192, 0.7)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+}
+
+function renderTortaChart(productos){
+    if(tortaChart){ tortaChart.destroy(); }
+    const ctx = document.getElementById('productos-torta-chart').getContext('2d');
+    const labels = productos.map(p => `${p.nombre} - ${p.talla} - ${p.colegio}`);
+    const datos = productos.map(p => p.cantidad);
+
+    tortaChart = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: datos,
+                backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#8BC34A', '#FF9800', '#9C27B0']
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const index = context.dataIndex;
+                            const producto = productos[index];
+                            return [`${producto.nombre} - ${producto.talla} - ${producto.colegio}`, `Cantidad: ${producto.cantidad}`, `Total: $${producto.total}`];
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+$('#btn-filtrar').on('click', function(){
+    fetchVentasData();
+});
+
+$(document).ready(function(){
+    fetchVentasData();
+    fetchStockBajo();
+    fetchProductosTendencia();
+});
+</script>
+{% endblock %}

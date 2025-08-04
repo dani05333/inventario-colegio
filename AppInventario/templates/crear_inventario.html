@@ -1,0 +1,42 @@
+{% extends 'inicio.html' %}
+{% block content %}
+
+<div class="container my-5">
+  <div class="row justify-content-center">
+    <div class="col-lg-8 col-md-10">
+      <div class="card rounded-5 shadow-lg border-0">
+        <div class="card-header bg-gradient-primary text-white text-center py-4 rounded-top-5">
+          <h2 class="fw-bold mb-0">
+            {% if form.instance.pk %}Editar Inventario{% else %}Agregar Inventario{% endif %}
+          </h2>
+        </div>
+        <div class="card-body p-5">
+          <form method="post" novalidate>
+            {% csrf_token %}
+            <div class="mb-4">
+              {% for field in form %}
+                <div class="mb-3">
+                  <label for="{{ field.id_for_label }}" class="form-label fw-semibold">{{ field.label }}</label>
+                  {{ field }}
+                  {% if field.errors %}
+                    <small class="text-danger">{{ field.errors|striptags }}</small>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
+            <div class="d-flex justify-content-between align-items-center mt-4">
+              <a href="{% url 'ver_inventario' %}" class="btn btn-outline-secondary shadow-sm px-4 py-2 rounded-pill">
+                Cancelar
+              </a>
+              <button type="submit" class="btn btn-gradient-primary px-5 py-2 rounded-pill shadow-sm text-white fw-semibold" style="background: linear-gradient(90deg, #6b6e68dc, #abb4a7); border:none;">
+                {% if form.instance.pk %}Actualizar{% else %}Guardar{% endif %}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
