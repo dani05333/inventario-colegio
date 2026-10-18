@@ -1,0 +1,164 @@
+{% extends 'base.html' %}
+{% block title %}Sistema{% endblock %}
+{% block page_title %}Sistema{% endblock %}
+{% block page_subtitle %}Versión, actualizaciones y respaldos{% endblock %}
+
+{% block extra_head %}
+<style>
+  .sys-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; max-width: 1100px; }
+  @media (max-width: 991.98px) { .sys-grid { grid-template-columns: 1fr; } }
+  .version-big { font-size: 34px; font-weight: 800; letter-spacing: -.02em; }
+  .update-box { border-radius: 12px; padding: 16px; margin-top: 16px; }
+  .update-box.ok { background: var(--success-50); color: var(--success); }
+  .update-box.nueva { background: var(--primary-50); color: var(--text); border: 1px solid var(--primary-100); }
+  .update-box.error { background: var(--warning-50); color: var(--warning); }
+  .notas { white-space: pre-wrap; font-size: 13.5px; color: var(--text-2); background: #fff; border-radius: 10px; padding: 12px 14px; margin: 10px 0 14px; max-height: 220px; overflow: auto; border: 1px solid var(--border); }
+  .ruta { font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; word-break: break-all; }
+  .overlay {
+    position: fixed; inset: 0; z-index: 3000; background: rgba(244, 245, 249, .96);
+    display: none; align-items: center; justify-content: center; text-align: center; padding: 24px;
+  }
+  .overlay.on { display: flex; }
+  .overlay .spinner-border { width: 3rem; height: 3rem; color: var(--primary); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sys-grid">
+  <!-- Versión y actualizaciones -->
+  <div class="panel">
+    <div class="panel-header"><div><h2 class="panel-title">Versión del programa</h2><p class="panel-sub">Chloe POS</p></div></div>
+    <div class="panel-body">
+      <div class="text-secondary small">Versión instalada</div>
+      <div class="version-big">{{ APP_VERSION }}</div>
+
+      {% if INSTALADO %}
+        <button class="btn btn-primary mt-3" id="btn-buscar"><i class="bi bi-arrow-repeat me-1"></i>Buscar actualizaciones</button>
+        <div id="resultado"></div>
+      {% else %}
+        <div class="update-box error"><i class="bi bi-info-circle me-1"></i>Estás en modo desarrollo. Las actualizaciones solo funcionan en el programa instalado.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Respaldos -->
+  <div class="panel">
+    <div class="panel-header">
+      <div><h2 class="panel-title">Respaldos de la base de datos</h2><p class="panel-sub">Se crea uno automático cada día al abrir el programa y antes de cada actualización</p></div>
+      <button class="btn btn-soft text-nowrap" id="btn-respaldar"><i class="bi bi-shield-check me-1"></i>Respaldar ahora</button>
+    </div>
+    <div class="panel-body pb-2">
+      <div class="small text-secondary mb-1">Carpeta de respaldos</div>
+      <div class="ruta mb-3">{{ respaldos_dir }}</div>
+      {% if respaldos %}
+      <ul class="list-clean" style="margin:0 -20px">
+        {% for r in respaldos %}
+        <li>
+          <i class="bi bi-database text-secondary"></i>
+          <div class="grow">
+            <div class="title">{{ r.fecha|date:"d-m-Y H:i" }}</div>
+            <div class="cell-sub">{{ r.nombre }} · {{ r.kb }} KB</div>
+          </div>
+          <span class="badge-soft {% if r.motivo == 'manual' %}badge-primary{% elif r.motivo == 'diario' %}badge-muted{% else %}badge-ok{% endif %}">
+            {% if r.motivo == 'manual' %}Manual{% elif r.motivo == 'diario' %}Diario{% else %}Actualización{% endif %}
+          </span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="empty py-4"><i class="bi bi-database"></i><strong>Aún no hay respaldos</strong>Usa «Respaldar ahora» para crear el primero.</div>
+      {% endif %}
+    </div>
+    <div class="modal-footer justify-content-start small text-secondary">
+      <i class="bi bi-lightbulb me-1"></i>Consejo: de vez en cuando copia esta carpeta a un pendrive o a la nube.
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div>
+    <div class="spinner-border mb-4"></div>
+    <h2 class="h4 fw-bold" id="ov-titulo">Actualizando Chloe POS…</h2>
+    <p class="text-secondary mb-0" id="ov-texto">Descargando la nueva versión. No cierres esta ventana; el programa se volverá a abrir solo.</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const CSRF = '{{ csrf_token }}';
+
+function pintarResultado(r) {
+  const box = $('#resultado');
+  if (r.status !== 'success') {
+    box.html(`<div class="update-box error"><i class="bi bi-wifi-off me-1"></i>${App.esc(r.message || 'No se pudo revisar.')}</div>`);
+    return;
+  }
+  if (!r.nueva) {
+    box.html(`<div class="update-box ok"><i class="bi bi-check-circle-fill me-1"></i>Tienes la última versión (${App.esc(r.actual)}).</div>`);
+    return;
+  }
+  box.html(`
+    <div class="update-box nueva">
+      <div class="fw-bold"><i class="bi bi-stars me-1 text-primary"></i>Hay una versión nueva: ${App.esc(r.version)}</div>
+      <div class="small text-secondary">Tamaño de la descarga: ${r.mb} MB</div>
+      ${r.notas ? `<div class="notas">${App.esc(r.notas)}</div>` : '<div class="mb-3"></div>'}
+      <button class="btn btn-primary" id="btn-actualizar"><i class="bi bi-download me-1"></i>Actualizar ahora</button>
+      <div class="small text-secondary mt-2">Se hará un respaldo de la base de datos antes de instalar. Tus ventas e inventario no se modifican.</div>
+    </div>`);
+  $('#btn-actualizar').on('click', () => actualizar(r.version));
+}
+
+$('#btn-buscar').on('click', function () {
+  const btn = $(this).prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Buscando…');
+  $.getJSON("{% url 'sistema_buscar_actualizacion' %}")
+    .done(pintarResultado)
+    .fail(xhr => pintarResultado(xhr.responseJSON || { status: 'error' }))
+    .always(() => btn.prop('disabled', false).html('<i class="bi bi-arrow-repeat me-1"></i>Buscar actualizaciones'));
+});
+
+function actualizar(version) {
+  if (!confirm(`¿Instalar la versión ${version} ahora?\n\nEl programa se cerrará unos segundos y se volverá a abrir. Asegúrate de no tener una venta a medias.`)) return;
+  $('#overlay').addClass('on');
+  $.ajax({ url: "{% url 'sistema_actualizar' %}", method: 'POST', headers: { 'X-CSRFToken': CSRF } })
+    .done(() => {
+      $('#ov-texto').text('Instalando… esto toma menos de un minuto.');
+      esperarNuevaVersion(version);
+    })
+    .fail(xhr => {
+      $('#overlay').removeClass('on');
+      App.toast((xhr.responseJSON && xhr.responseJSON.message) || 'No se pudo actualizar.', 'error', 6000);
+    });
+}
+
+// Espera a que el programa vuelva con la versión nueva y recarga la página
+function esperarNuevaVersion(version) {
+  const inicio = Date.now();
+  const intento = () => {
+    fetch("{% url 'sistema_salud' %}", { cache: 'no-store' })
+      .then(r => r.json())
+      .then(d => {
+        if (d.version === version) { $('#ov-titulo').text('¡Listo!'); setTimeout(() => location.reload(), 800); }
+        else setTimeout(intento, 2000);
+      })
+      .catch(() => {
+        if (Date.now() - inicio > 180000) {
+          $('#ov-titulo').text('La actualización está tardando más de lo normal');
+          $('#ov-texto').text('Cierra esta ventana y vuelve a abrir Chloe POS desde el ícono del escritorio.');
+        } else setTimeout(intento, 2000);
+      });
+  };
+  setTimeout(intento, 4000);
+}
+
+$('#btn-respaldar').on('click', function () {
+  const btn = $(this).prop('disabled', true);
+  $.ajax({ url: "{% url 'sistema_respaldar' %}", method: 'POST', headers: { 'X-CSRFToken': CSRF } })
+    .done(r => { App.toast(`Respaldo creado: ${r.archivo}`, 'success'); setTimeout(() => location.reload(), 900); })
+    .fail(xhr => App.toast((xhr.responseJSON && xhr.responseJSON.message) || 'No se pudo respaldar', 'error', 6000))
+    .always(() => btn.prop('disabled', false));
+});
+
+{% if INSTALADO %}if (new URLSearchParams(location.search).get('buscar')) $('#btn-buscar').click();{% endif %}
+</script>
+{% endblock %}

@@ -1,6 +1,8 @@
 /* Chloe Creaciones · POS — utilidades compartidas */
 
 const App = (function () {
+  // Ruta de los archivos estáticos (la define la plantilla); todo se sirve localmente, sin internet
+  const STATIC = window.APP_STATIC || '/static/';
   const moneyFmt = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 });
   const numFmt = new Intl.NumberFormat('es-CL');
 
@@ -111,7 +113,7 @@ const App = (function () {
   /* Descarga la boleta como PDF en formato de rollo de 80 mm */
   async function downloadReceipt(venta) {
     try {
-      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js');
+      await loadScript(STATIC + 'vendor/html2pdf/html2pdf.bundle.min.js');
     } catch (e) {
       toast('No se pudo preparar el PDF (¿hay conexión a internet?)', 'error');
       return;
@@ -136,7 +138,7 @@ const App = (function () {
   }
 
   /* ---------- Códigos de barras ---------- */
-  const JSBARCODE_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js';
+  const JSBARCODE_URL = STATIC + 'vendor/jsbarcode/JsBarcode.all.min.js';
 
   function esEan13(code) {
     if (!/^\d{13}$/.test(code)) return false;

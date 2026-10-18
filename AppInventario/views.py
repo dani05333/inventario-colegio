@@ -1,8 +1,10 @@
 import json
+import logging
 from collections import defaultdict
 from datetime import datetime, time, timedelta
 from decimal import Decimal
 
+from django.conf import settings
 from django.core.paginator import Paginator
 from django.db import models, transaction
 from django.db.models import F, ProtectedError, Q, Sum
@@ -14,7 +16,10 @@ from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_GET, require_POST
 from django.views.generic.edit import CreateView, DeleteView, UpdateView
 
+from . import sistema
 from .models import Colegio, DetalleVenta, Inventario, Talla, Uniforme, Venta
+
+logger = logging.getLogger(__name__)
 
 
 def inicio(request):
@@ -391,6 +396,54 @@ def boleta(request, pk):
         'anterior': anterior,
         'siguiente': siguiente,
     })
+
+
+# ---------------------------------------------------------------------------
+# Sistema: versión, respaldos y actualizaciones
+# ---------------------------------------------------------------------------
+
+def ver_sistema(request):
+    return render(request, 'sistema.html', {
+        'respaldos': sistema.listar_respaldos(),
+        'respaldos_dir': settings.RESPALDOS_DIR,
+        'datos_dir': settings.DATA_DIR,
+    })
+
+
+@require_GET
+def sistema_salud(request):
+    return JsonResponse({'ok': True, 'version': settings.APP_VERSION})
+
+
+@require_GET
+def sistema_buscar_actualizacion(request):
+    try:
+        return JsonResponse({'status': 'success', **sistema.buscar_actualizacion()})
+    except Exception:
+        logger.warning('No se pudo buscar actualizaciones', exc_info=True)
+        return JsonResponse({'status': 'error', 'message': 'No se pudo revisar si hay actualizaciones. ¿Hay conexión a internet?'}, status=503)
+
+
+@require_POST
+def sistema_actualizar(request):
+    try:
+        info = sistema.descargar_e_instalar()
+    except RuntimeError as e:
+        return _error(str(e))
+    except Exception:
+        logger.exception('Falló la actualización')
+        return JsonResponse({'status': 'error', 'message': 'No se pudo descargar la actualización. Revisa la conexión e intenta nuevamente.'}, status=503)
+    return JsonResponse({'status': 'success', 'version': info['version']})
+
+
+@require_POST
+def sistema_respaldar(request):
+    try:
+        archivo = sistema.crear_respaldo('manual')
+    except Exception as e:
+        logger.exception('Falló el respaldo')
+        return _error(f'No se pudo crear el respaldo: {e}')
+    return JsonResponse({'status': 'success', 'archivo': archivo.name})
 
 
 # ---------------------------------------------------------------------------

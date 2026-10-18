@@ -16,12 +16,10 @@
     })();
   </script>
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-  <link href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+  <link href="{% static 'vendor/inter/inter.css' %}" rel="stylesheet">
+  <link href="{% static 'vendor/bootstrap/bootstrap.min.css' %}" rel="stylesheet">
+  <link href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}" rel="stylesheet">
+  <link href="{% static 'vendor/datatables/dataTables.bootstrap5.min.css' %}" rel="stylesheet">
   <link href="{% static 'AppInventario/app.css' %}" rel="stylesheet">
   {% block extra_head %}{% endblock %}
 </head>
@@ -56,6 +54,11 @@
         <li><a href="{% url 'ver_uniformes' %}" title="Uniformes" class="{% if n in 'ver_uniformes crear_uniforme editar_uniforme eliminar_uniforme' %}active{% endif %}"><i class="bi bi-person-badge"></i><span>Uniformes</span></a></li>
         <li><a href="{% url 'ver_tallas' %}" title="Tallas" class="{% if n in 'ver_tallas crear_talla editar_tallas eliminar_tallas' %}active{% endif %}"><i class="bi bi-rulers"></i><span>Tallas</span></a></li>
       </ul>
+
+      <div class="nav-section"><span>Programa</span></div>
+      <ul class="side-nav">
+        <li><a href="{% url 'sistema' %}" title="Sistema (versión {{ APP_VERSION }})" class="{% if n == 'sistema' %}active{% endif %}" id="nav-sistema"><i class="bi bi-gear"></i><span>Sistema <small class="text-secondary fw-normal">v{{ APP_VERSION }}</small></span></a></li>
+      </ul>
     </nav>
 
     <div class="sidebar-cta">
@@ -88,11 +91,34 @@
 
   <div id="print-area"></div>
 
-  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
-  <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+  <script src="{% static 'vendor/jquery/jquery-3.7.1.min.js' %}"></script>
+  <script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
+  <script src="{% static 'vendor/datatables/jquery.dataTables.min.js' %}"></script>
+  <script src="{% static 'vendor/datatables/dataTables.bootstrap5.min.js' %}"></script>
+  <script>window.APP_STATIC = "{% static '' %}";</script>
   <script src="{% static 'AppInventario/app.js' %}"></script>
+  {% if INSTALADO %}
+  <script>
+    // Una vez por sesión: revisa si hay una versión nueva y la señala en el menú (sin instalar nada)
+    (function () {
+      const marcar = v => {
+        const a = document.getElementById('nav-sistema');
+        if (a && !a.querySelector('.upd-dot')) a.insertAdjacentHTML('beforeend', '<span class="upd-dot" title="Hay una versión nueva"></span>');
+      };
+      let nueva = null;
+      try { nueva = sessionStorage.getItem('chloe_upd'); } catch (e) {}
+      if (nueva) { if (nueva !== 'no') marcar(nueva); return; }
+      fetch("{% url 'sistema_buscar_actualizacion' %}").then(r => r.json()).then(d => {
+        const v = d.status === 'success' && d.nueva ? d.version : 'no';
+        try { sessionStorage.setItem('chloe_upd', v); } catch (e) {}
+        if (v !== 'no') {
+          marcar(v);
+          App.toast(`Hay una versión nueva de Chloe POS (${v}). Puedes instalarla desde «Sistema».`, 'info', 7000);
+        }
+      }).catch(() => {});
+    })();
+  </script>
+  {% endif %}
   {% block extra_scripts %}{% endblock %}
 </body>
 </html>

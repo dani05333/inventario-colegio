@@ -147,6 +147,8 @@ a:hover { color: var(--primary-600); }
 .side-nav a:hover { background: var(--surface-2); color: var(--text); }
 .side-nav a.active { background: var(--primary-50); color: var(--primary); font-weight: 600; }
 
+.side-nav a { position: relative; }
+.upd-dot { position: absolute; top: 8px; left: 26px; width: 9px; height: 9px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 0 2px var(--surface); }
 .sidebar-scroll { flex: 1; overflow-y: auto; min-height: 0; padding-bottom: 8px; }
 .sidebar-cta { padding: 12px 16px 14px; border-top: 1px solid var(--border); }
 .sidebar-cta .btn { width: 100%; }

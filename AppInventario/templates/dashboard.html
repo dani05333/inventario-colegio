@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}Análisis{% endblock %}
 {% block page_title %}Análisis de ventas{% endblock %}
 {% block page_subtitle %}Cómo va el negocio{% endblock %}
@@ -150,7 +151,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{% static 'vendor/chartjs/chart.umd.min.js' %}"></script>
 <script>
 const COLOR = { primary: '#6250d6', grid: '#eceef3', axis: '#868c9c', text: '#151821' };
 const EDIT_URL = "{% url 'editar_inventario' 0 %}";

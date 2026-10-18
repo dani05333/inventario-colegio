@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}Etiquetas{% endblock %}
 {% block page_title %}Etiquetas con código de barras{% endblock %}
 {% block page_subtitle %}Elige los productos, cuántas etiquetas de cada uno y el formato de impresión{% endblock %}
@@ -118,7 +119,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
+<script src="{% static 'vendor/jsbarcode/JsBarcode.all.min.js' %}"></script>
 <script>
 /* Medidas en milímetros */
 const FORMATOS = {

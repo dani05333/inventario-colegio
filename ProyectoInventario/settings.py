@@ -21,16 +21,36 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config('SECRET_KEY')
+# Versión del programa (la usa el botón "Buscar actualizaciones")
+APP_VERSION = (BASE_DIR / 'VERSION').read_text(encoding='utf-8').strip()
+UPDATE_REPO = 'dani05333/inventario-colegio'
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG', cast=bool)
+# Modo instalado (programa de escritorio en el POS): lo activa el lanzador
+# definiendo CHLOE_DATA_DIR, la carpeta donde viven la base de datos y la clave.
+DATA_DIR = os.environ.get('CHLOE_DATA_DIR')
+INSTALADO = bool(DATA_DIR)
+if INSTALADO:
+    DATA_DIR = Path(DATA_DIR)
+    RESPALDOS_DIR = Path(os.environ.get('CHLOE_BACKUP_DIR') or DATA_DIR / 'respaldos')
+else:
+    RESPALDOS_DIR = BASE_DIR / 'respaldos'
 
-ALLOWED_HOSTS = []
-RENDER_EXTERNAL_HOSTNAME = config('RENDER_EXTERNAL_HOSTNAME', default='')
-if RENDER_EXTERNAL_HOSTNAME:
-    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+if INSTALADO:
+    # Clave única por instalación, generada por el lanzador
+    SECRET_KEY = (DATA_DIR / 'secret.key').read_text(encoding='utf-8').strip()
+    DEBUG = False
+    ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
+else:
+    # SECURITY WARNING: keep the secret key used in production secret!
+    SECRET_KEY = config('SECRET_KEY')
+
+    # SECURITY WARNING: don't run with debug turned on in production!
+    DEBUG = config('DEBUG', cast=bool)
+
+    ALLOWED_HOSTS = []
+    RENDER_EXTERNAL_HOSTNAME = config('RENDER_EXTERNAL_HOSTNAME', default='')
+    if RENDER_EXTERNAL_HOSTNAME:
+        ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
 
 
 # Application definition
@@ -47,13 +67,13 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
 ]
 
 ROOT_URLCONF = 'ProyectoInventario.urls'
@@ -69,6 +89,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'AppInventario.context_processors.sistema',
             ],
         },
     },
@@ -80,8 +101,16 @@ WSGI_APPLICATION = 'ProyectoInventario.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-# Si no hay DB_NAME en el .env se usa SQLite (desarrollo local); si lo hay, MySQL.
-if config('DB_NAME', default=''):
+# Instalado: SQLite en la carpeta de datos del equipo.
+# Si no, y no hay DB_NAME en el .env, SQLite en el proyecto (desarrollo local); si lo hay, MySQL.
+if INSTALADO:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': DATA_DIR / 'chloe-pos.sqlite3',
+        }
+    }
+elif config('DB_NAME', default=''):
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.mysql',
@@ -143,7 +172,8 @@ STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # This production code might break development mode, so we check whether we're in DEBUG mode
-if not DEBUG:
+# (el programa instalado sirve con WhiteNoise los archivos ya reunidos en staticfiles)
+if not DEBUG and not INSTALADO:
     # Tell Django to copy static assets into a path called `staticfiles` (this is specific to Render)
     STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
@@ -155,3 +185,23 @@ if not DEBUG:
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Instalado: los errores quedan en un archivo para poder revisarlos si algo falla en el POS
+if INSTALADO:
+    (DATA_DIR / 'logs').mkdir(parents=True, exist_ok=True)
+    LOGGING = {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'formatters': {'simple': {'format': '%(asctime)s %(levelname)s %(name)s: %(message)s'}},
+        'handlers': {
+            'archivo': {
+                'class': 'logging.handlers.RotatingFileHandler',
+                'filename': DATA_DIR / 'logs' / 'chloe-pos.log',
+                'maxBytes': 1_000_000,
+                'backupCount': 3,
+                'encoding': 'utf-8',
+                'formatter': 'simple',
+            },
+        },
+        'root': {'handlers': ['archivo'], 'level': 'WARNING'},
+    }

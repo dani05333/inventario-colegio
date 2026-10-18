@@ -1,0 +1,6 @@
+# Paquetes que se incluyen en el programa instalado (Python 3.13 portable)
+Django>=5.2,<5.3
+python-decouple==3.8
+whitenoise>=6.9,<7
+waitress>=3.0,<4
+tzdata
