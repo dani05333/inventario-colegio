@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block title %}Colores{% endblock %}
+{% block page_title %}Colores{% endblock %}
+{% block page_subtitle %}Colores disponibles para los uniformes{% endblock %}
+
+{% block content %}
+{% url 'crear_color' as crear_url %}{% url 'editar_color' 0 as editar_url0 %}{% url 'eliminar_color' 0 as eliminar_url0 %}{% url 'colores_json' as json_url %}
+{% include 'partials/catalogo.html' with singular='Color' plural='Colores' ayuda='Opcional en cada producto. Por ejemplo: azul marino, verde, gris.' %}
+{% endblock %}

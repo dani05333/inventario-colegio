@@ -46,9 +46,10 @@
       <input type="search" id="inv-search" class="form-control" placeholder="Buscar por nombre o código…">
     </div>
     <div class="d-flex gap-2 flex-wrap">
-      <select class="form-select filtro" data-column="2" style="width:auto"><option value="">Todos los colegios</option></select>
+      <select class="form-select filtro" data-column="3" style="width:auto"><option value="">Todos los colegios</option></select>
       <select class="form-select filtro" data-column="1" style="width:auto"><option value="">Todos los uniformes</option></select>
-      <select class="form-select filtro" data-column="3" style="width:auto"><option value="">Todas las tallas</option></select>
+      <select class="form-select filtro" data-column="2" style="width:auto"><option value="">Todos los colores</option></select>
+      <select class="form-select filtro" data-column="4" style="width:auto"><option value="">Todas las tallas</option></select>
       <select class="form-select" id="filtro-stock" style="width:auto">
         <option value="">Todo el stock</option>
         <option value="bajo">Stock bajo</option>
@@ -63,6 +64,7 @@
         <tr>
           <th>Código</th>
           <th>Uniforme</th>
+          <th>Color</th>
           <th>Colegio</th>
           <th>Talla</th>
           <th class="num">Stock</th>
@@ -111,6 +113,7 @@ $(function () {
           ? (App.codigoValido(d) ? `<span class="code-pill">${App.esc(d)}</span>` : `<span class="badge-soft badge-warn">Sin código</span>`)
           : d },
       { data: 'uniforme', render: (d, t) => t === 'display' ? `<span class="cell-strong">${App.esc(d)}</span>` : d },
+      { data: 'color', render: (d, t) => t === 'display' ? (d ? App.esc(d) : '<span class="cell-sub">—</span>') : d },
       { data: 'colegio', render: (d, t) => t === 'display' ? App.esc(d) : d },
       { data: 'talla', render: (d, t) => t === 'display' ? `<span class="badge-soft badge-muted">${App.esc(d)}</span>` : d },
       { data: 'cantidad', className: 'num', render: (d, t) => t === 'display' ? stockBadge(d) : d },

@@ -2,7 +2,7 @@ import re
 
 from django import forms
 
-from .models import Colegio, Talla, Uniforme, Inventario
+from .models import Colegio, Color, Conjunto, Inventario, Talla, Uniforme
 
 
 def normalizar_nombre(nombre):
@@ -51,22 +51,56 @@ class UniformeForm(NombreUnicoForm):
         fields = ['nombre']
 
 
+class ColorForm(NombreUnicoForm):
+    etiqueta = 'el color'
+
+    class Meta:
+        model = Color
+        fields = ['nombre']
+
+
 class InventarioForm(forms.ModelForm):
     class Meta:
         model = Inventario
-        fields = ['codigo_barras', 'cantidad', 'colegio', 'talla', 'uniforme', 'precio']
+        fields = ['codigo_barras', 'cantidad', 'colegio', 'talla', 'uniforme', 'color', 'precio']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['color'].empty_label = 'Sin color'
 
     def clean_codigo_barras(self):
         return (self.cleaned_data.get('codigo_barras') or '').strip()
 
     def clean(self):
         datos = super().clean()
-        colegio, talla, uniforme = datos.get('colegio'), datos.get('talla'), datos.get('uniforme')
+        colegio, talla, uniforme, color = datos.get('colegio'), datos.get('talla'), datos.get('uniforme'), datos.get('color')
         if colegio and talla and uniforme:
-            repetido = (Inventario.objects.filter(colegio=colegio, talla=talla, uniforme=uniforme)
+            repetido = (Inventario.objects.filter(colegio=colegio, talla=talla, uniforme=uniforme, color=color)
                         .exclude(pk=self.instance.pk).first())
             if repetido:
+                nombre = f'{uniforme} {color}' if color else str(uniforme)
                 raise forms.ValidationError(
-                    f'Ya existe el producto «{uniforme} · talla {talla} · {colegio}» '
+                    f'Ya existe el producto «{nombre} · talla {talla} · {colegio}» '
                     f'(código {repetido.codigo_barras}). Si llegaron más unidades, edita ese producto y suma el stock.')
         return datos
+
+
+class ConjuntoForm(forms.ModelForm):
+    class Meta:
+        model = Conjunto
+        fields = ['nombre', 'colegio', 'componentes', 'precio', 'activo']
+        widgets = {'componentes': forms.CheckboxSelectMultiple}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['colegio'].empty_label = 'Todos los colegios'
+        self.fields['componentes'].queryset = Uniforme.objects.order_by('nombre')
+
+    def clean_nombre(self):
+        return normalizar_nombre(self.cleaned_data.get('nombre'))
+
+    def clean_componentes(self):
+        componentes = self.cleaned_data.get('componentes')
+        if not componentes or len(componentes) < 2:
+            raise forms.ValidationError('Elige al menos 2 prendas que formen el conjunto.')
+        return componentes

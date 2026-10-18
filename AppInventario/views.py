@@ -9,16 +9,16 @@ from django.core.paginator import Paginator
 from django.db import models, transaction
 from django.db.models import F, ProtectedError, Q, Sum
 from django.http import FileResponse, Http404, JsonResponse
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_GET, require_POST
 from django.views.generic.edit import CreateView, DeleteView, UpdateView
 
-from . import presentacion, seguridad, sistema
-from .forms import ColegioForm, InventarioForm, TallaForm, UniformeForm
-from .models import Colegio, DetalleVenta, Inventario, Talla, Uniforme, Venta
+from . import conjuntos, presentacion, seguridad, sistema
+from .forms import ColegioForm, ColorForm, ConjuntoForm, InventarioForm, TallaForm, UniformeForm
+from .models import Colegio, Color, Conjunto, DetalleVenta, Inventario, PrecioConjuntoTalla, Talla, Uniforme, Venta
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +35,7 @@ def inicio(request):
 NOMBRES_DEPENDENCIAS = {
     Inventario: ('producto del inventario', 'productos del inventario'),
     DetalleVenta: ('venta registrada', 'ventas registradas'),
+    Conjunto: ('conjunto', 'conjuntos'),
 }
 
 
@@ -161,6 +162,82 @@ class InventarioDeleteView(EliminarProtegidoMixin, DeleteView):
     ayuda_bloqueo = 'Para que el historial quede completo, los productos con ventas no se borran. Si ya no lo vendes, deja su stock en 0.'
 
 
+class ColorCreateView(CreateView):
+    model = Color
+    form_class = ColorForm
+    template_name = 'crear_colores.html'
+    success_url = reverse_lazy('ver_colores')
+
+
+class ColorUpdateView(UpdateView):
+    model = Color
+    form_class = ColorForm
+    template_name = 'crear_colores.html'
+    success_url = reverse_lazy('ver_colores')
+
+
+class ColorDeleteView(EliminarProtegidoMixin, DeleteView):
+    model = Color
+    success_url = reverse_lazy('ver_colores')
+    ayuda_bloqueo = 'Primero cambia de color o elimina esos productos en el inventario.'
+
+
+def ver_colores(request):
+    return render(request, 'colores.html')
+
+
+def colores_json(request):
+    return JsonResponse({'data': list(Color.objects.values('id', 'nombre'))})
+
+
+# ---------------------------------------------------------------------------
+# Conjuntos (por ejemplo, 'Buzo completo')
+# ---------------------------------------------------------------------------
+
+def ver_conjuntos(request):
+    lista = (Conjunto.objects.select_related('colegio')
+             .prefetch_related('componentes', 'precios_talla__talla').order_by('nombre'))
+    return render(request, 'conjuntos.html', {'conjuntos': lista})
+
+
+def editar_conjunto(request, pk=None):
+    conjunto = get_object_or_404(Conjunto, pk=pk) if pk else None
+    tallas = list(Talla.objects.all())
+    form = ConjuntoForm(request.POST or None, instance=conjunto)
+    precios = {p.talla_id: p.precio for p in conjunto.precios_talla.all()} if conjunto else {}
+    error_precios = None
+
+    if request.method == 'POST':
+        nuevos = {}
+        for t in tallas:
+            valor = (request.POST.get(f'precio_talla_{t.id}') or '').strip().replace('.', '')
+            if valor:
+                if not valor.isdigit():
+                    error_precios = f'El precio de la talla {t} no es un número válido.'
+                else:
+                    nuevos[t.id] = int(valor)
+        precios = nuevos
+        if form.is_valid() and not error_precios:
+            with transaction.atomic():
+                conjunto = form.save()
+                conjunto.precios_talla.all().delete()
+                PrecioConjuntoTalla.objects.bulk_create(
+                    [PrecioConjuntoTalla(conjunto=conjunto, talla_id=tid, precio=precio) for tid, precio in nuevos.items()])
+            return redirect('ver_conjuntos')
+
+    return render(request, 'crear_conjunto.html', {
+        'form': form,
+        'conjunto': conjunto,
+        'filas_tallas': [(t, precios.get(t.id, '')) for t in tallas],
+        'error_precios': error_precios,
+    })
+
+
+class ConjuntoDeleteView(EliminarProtegidoMixin, DeleteView):
+    model = Conjunto
+    success_url = reverse_lazy('ver_conjuntos')
+
+
 def ver_colegios(request):
     return render(request, 'colegios.html')
 
@@ -189,7 +266,7 @@ def ver_inventario(request):
     return render(request,'inventario.html')
 
 def inventario_json(request):
-    inventario = Inventario.objects.select_related('colegio', 'talla', 'uniforme').all()
+    inventario = Inventario.objects.select_related('colegio', 'talla', 'uniforme', 'color').all()
     data = []
 
     for item in inventario:
@@ -199,6 +276,11 @@ def inventario_json(request):
             'colegio': item.colegio.nombre,
             'talla': item.talla.nombre,
             'uniforme': item.uniforme.nombre,
+            'color': item.color.nombre if item.color_id else '',
+            'nombre': item.nombre_completo,
+            'uniforme_id': item.uniforme_id,
+            'talla_id': item.talla_id,
+            'colegio_id': item.colegio_id,
             'cantidad': item.cantidad,
             'precio_unitario': float(item.precio),
             'precio_total': float(item.cantidad * item.precio)
@@ -319,7 +401,7 @@ def registrar_venta(request):
     # Todo o nada: si algo falla, no se descuenta stock ni queda una venta a medias
     with transaction.atomic():
         productos = (Inventario.objects.select_for_update()
-                     .select_related('uniforme', 'talla', 'colegio')
+                     .select_related('uniforme', 'talla', 'colegio', 'color')
                      .in_bulk(list(cantidades)))
 
         for producto_id, cantidad in cantidades.items():
@@ -328,15 +410,22 @@ def registrar_venta(request):
                 return _error('Uno de los productos del carrito ya no existe. Recarga la página.')
             if cantidad > producto.cantidad:
                 return _error(
-                    f"No hay suficiente stock de {producto.uniforme.nombre} - {producto.talla.nombre} - "
+                    f"No hay suficiente stock de {producto.nombre_completo} - {producto.talla.nombre} - "
                     f"{producto.colegio.nombre} (quedan {producto.cantidad})."
                 )
+
+        # Precios: los de la base de datos, aplicando los conjuntos (por ejemplo, 'Buzo completo')
+        lineas = [{
+            'id': pid, 'uniforme_id': productos[pid].uniforme_id, 'talla_id': productos[pid].talla_id,
+            'colegio_id': productos[pid].colegio_id, 'precio': int(productos[pid].precio), 'cantidad': cant,
+        } for pid, cant in cantidades.items()]
+        armados, cobrado = conjuntos.armar(lineas, conjuntos.conjuntos_activos())
 
         venta = Venta.objects.create(total=0, metodo_pago=metodo_pago)
         total = Decimal(0)
         for producto_id, cantidad in cantidades.items():
             producto = productos[producto_id]
-            subtotal = producto.precio * cantidad
+            subtotal = Decimal(cobrado[producto_id])
             DetalleVenta.objects.create(
                 venta=venta,
                 inventario=producto,
@@ -349,9 +438,22 @@ def registrar_venta(request):
             total += subtotal
 
         venta.total = total
-        venta.save(update_fields=['total'])
+        venta.conjuntos = [{
+            'nombre': a['nombre'],
+            'precio': a['precio'],
+            'talla': ' / '.join(dict.fromkeys(productos[pid].talla.nombre for pid in a['piezas'])),
+            'piezas': [{'inventario_id': pid, 'nombre': productos[pid].nombre_completo,
+                        'talla': productos[pid].talla.nombre} for pid in a['piezas']],
+        } for a in armados]
+        venta.save(update_fields=['total', 'conjuntos'])
 
-    return JsonResponse({'status': 'success', 'venta_id': venta.id, 'total': float(total)})
+    venta = _ventas_con_detalle().get(pk=venta.pk)
+    return JsonResponse({'status': 'success', 'venta_id': venta.id, 'total': float(total), 'venta': _venta_dict(venta)})
+
+
+@require_GET
+def conjuntos_activos(request):
+    return JsonResponse({'conjuntos': conjuntos.conjuntos_activos()})
 
 
 # ---------------------------------------------------------------------------
@@ -360,7 +462,8 @@ def registrar_venta(request):
 
 def _venta_dict(venta):
     items = [{
-        'nombre': d.inventario.uniforme.nombre,
+        'inventario_id': d.inventario_id,
+        'nombre': d.inventario.nombre_completo,
         'talla': d.inventario.talla.nombre,
         'colegio': d.inventario.colegio.nombre,
         'cantidad': d.cantidad,
@@ -378,6 +481,7 @@ def _venta_dict(venta):
         'anulada': venta.anulada,
         'fecha_anulacion': venta.fecha_anulacion.isoformat() if venta.fecha_anulacion else None,
         'motivo_anulacion': venta.motivo_anulacion,
+        'conjuntos': venta.conjuntos or [],
     }
 
 
@@ -386,6 +490,7 @@ def _ventas_con_detalle():
         'detalleventa_set__inventario__uniforme',
         'detalleventa_set__inventario__talla',
         'detalleventa_set__inventario__colegio',
+        'detalleventa_set__inventario__color',
     )
 
 
@@ -656,6 +761,7 @@ def ventas_data(request):
     # Productos más vendidos
     productos = detalles.values(
         nombre=F('inventario__uniforme__nombre'),
+        color=F('inventario__color__nombre'),
         talla=F('inventario__talla__nombre'),
         colegio=F('inventario__colegio__nombre')
     ).annotate(
@@ -664,7 +770,7 @@ def ventas_data(request):
     ).order_by('-cantidad')[:8]
 
     productos_list = [{
-        'nombre': p['nombre'],
+        'nombre': f"{p['nombre']} {p['color']}" if p['color'] else p['nombre'],
         'talla': p['talla'],
         'colegio': p['colegio'],
         'cantidad': p['cantidad'],
@@ -730,13 +836,13 @@ def historial_ventas_json(request):
 
 def stock_bajo(request):
     umbral = 10  # Stock crítico
-    inventario_bajo = Inventario.objects.filter(cantidad__lt=umbral).select_related('uniforme', 'talla', 'colegio')
+    inventario_bajo = Inventario.objects.filter(cantidad__lt=umbral).select_related('uniforme', 'talla', 'colegio', 'color')
 
     productos = []
     for item in inventario_bajo:
         productos.append({
             'id': item.id,
-            'nombre': item.uniforme.nombre,
+            'nombre': item.nombre_completo,
             'talla': item.talla.nombre,
             'colegio': item.colegio.nombre,
             'stock': item.cantidad
@@ -756,18 +862,19 @@ def productos_tendencia(request):
             venta__anulada=False, venta__fecha__gte=desde, venta__fecha__lt=hasta
         ).values(
             nombre=F('inventario__uniforme__nombre'),
+            color=F('inventario__color__nombre'),
             talla=F('inventario__talla__nombre'),
             colegio=F('inventario__colegio__nombre')
         ).annotate(cantidad=Sum('cantidad'))
 
-    anteriores = {(a['nombre'], a['talla'], a['colegio']): a['cantidad'] for a in vendidos(inicio, corte)}
+    anteriores = {(a['nombre'], a['color'], a['talla'], a['colegio']): a['cantidad'] for a in vendidos(inicio, corte)}
 
     tendencia = []
     for r in vendidos(corte, fin):
-        crecimiento = r['cantidad'] - anteriores.get((r['nombre'], r['talla'], r['colegio']), 0)
+        crecimiento = r['cantidad'] - anteriores.get((r['nombre'], r['color'], r['talla'], r['colegio']), 0)
         if crecimiento > 0:
             tendencia.append({
-                'nombre': r['nombre'],
+                'nombre': f"{r['nombre']} {r['color']}" if r['color'] else r['nombre'],
                 'talla': r['talla'],
                 'colegio': r['colegio'],
                 'crecimiento': crecimiento

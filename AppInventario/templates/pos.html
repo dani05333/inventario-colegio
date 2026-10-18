@@ -87,6 +87,11 @@
   .stepper input::-webkit-outer-spin-button, .stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   .t-unit { font-size: 12.5px; color: var(--muted); }
   .ticket-flash { animation: flash .6s ease-out; }
+  .combo-box { margin: 10px 14px 12px; border: 1px dashed var(--primary); border-radius: 12px; background: var(--primary-50); padding: 8px 12px; }
+  .combo-row { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; color: var(--primary-600); }
+  .combo-row + .combo-row { border-top: 1px dashed var(--primary-100); }
+  .combo-ahorro { font-size: 12px; color: var(--text-2); border-top: 1px dashed var(--primary-100); padding-top: 6px; margin-top: 2px; }
+  .p-color { font-size: 12px; font-weight: 600; color: var(--text-2); }
   @keyframes flash { from { background: var(--primary-50); } to { background: transparent; } }
 
   .ticket-foot { border-top: 1px solid var(--border); padding: 16px 18px 18px; background: var(--surface-2); }
@@ -275,6 +280,7 @@ const STORAGE_KEY = 'pos_carrito_v1';
 const MAX_CARDS = 120;
 
 let productos = [];
+let conjuntosActivos = [];
 let carrito = [];
 let colegioActivo = '';
 let ultimaVenta = null;
@@ -290,15 +296,21 @@ function cargarCarrito() { try { carrito = JSON.parse(localStorage.getItem(STORA
 
 /* ---------- Productos ---------- */
 function cargarProductos() {
-  return $.getJSON("{% url 'inventario_json' %}").then(res => {
+  return $.when($.getJSON("{% url 'inventario_json' %}"), $.getJSON("{% url 'conjuntos_activos' %}")).then((r1, r2) => {
+    const res = r1[0];
+    conjuntosActivos = r2[0].conjuntos;
     productos = res.data.map(p => ({
-      id: p.id, codigo: String(p.codigo_barras), nombre: p.uniforme, talla: p.talla,
+      id: p.id, codigo: String(p.codigo_barras), nombre: p.nombre, color: p.color, talla: p.talla,
       colegio: p.colegio, precio: p.precio_unitario, stock: p.cantidad,
-      _q: `${p.uniforme} ${p.talla} ${p.colegio} ${p.codigo_barras}`.toLowerCase()
+      uniforme_id: p.uniforme_id, talla_id: p.talla_id, colegio_id: p.colegio_id,
+      _q: `${p.nombre} ${p.talla} ${p.colegio} ${p.codigo_barras}`.toLowerCase()
     }));
-    // Sincroniza el carrito guardado con el stock actual
+    // Sincroniza el carrito guardado con el stock, precio y datos actuales de cada producto
     carrito = carrito.filter(c => productos.some(p => p.id === c.id));
-    carrito.forEach(c => { const p = productos.find(x => x.id === c.id); c.stock = p.stock; c.precio = p.precio; });
+    carrito.forEach(c => {
+      const p = productos.find(x => x.id === c.id);
+      Object.assign(c, { stock: p.stock, precio: p.precio, nombre: p.nombre, uniforme_id: p.uniforme_id, talla_id: p.talla_id, colegio_id: p.colegio_id });
+    });
     renderChips();
     renderGrid();
     renderTicket();
@@ -362,7 +374,8 @@ function agregar(id) {
     carrito.splice(carrito.indexOf(item), 1);
     carrito.unshift(item);
   } else {
-    carrito.unshift({ id: p.id, nombre: p.nombre, talla: p.talla, colegio: p.colegio, precio: p.precio, stock: p.stock, cantidad: 1 });
+    carrito.unshift({ id: p.id, nombre: p.nombre, talla: p.talla, colegio: p.colegio, precio: p.precio, stock: p.stock, cantidad: 1,
+                      uniforme_id: p.uniforme_id, talla_id: p.talla_id, colegio_id: p.colegio_id });
   }
   faseCliente = 'venta';
   renderTicket(id);
@@ -387,11 +400,27 @@ function quitar(id) {
 }
 
 function totales() {
-  return carrito.reduce((a, c) => ({ total: a.total + c.precio * c.cantidad, unidades: a.unidades + c.cantidad }), { total: 0, unidades: 0 });
+  const { sets, cobrado } = App.armarConjuntos(carrito, conjuntosActivos);
+  const total = Object.values(cobrado).reduce((a, v) => a + v, 0);
+  const normal = carrito.reduce((a, c) => a + c.precio * c.cantidad, 0);
+  return { total, normal, sets, unidades: carrito.reduce((a, c) => a + c.cantidad, 0) };
+}
+
+/* La venta como la vería el cliente: conjuntos como un ítem con su precio, el resto a precio normal */
+function ventaDelCarrito(sets) {
+  const tallaDe = id => (carrito.find(c => c.id === id) || {}).talla;
+  return {
+    items: carrito.map(c => ({ inventario_id: c.id, nombre: c.nombre, talla: c.talla, colegio: c.colegio, cantidad: c.cantidad, precio: c.precio })),
+    conjuntos: sets.map(s => ({
+      nombre: s.nombre, precio: s.precio,
+      talla: [...new Set(s.piezas.map(tallaDe))].join(' / '),
+      piezas: s.piezas.map(id => ({ inventario_id: id, nombre: (carrito.find(c => c.id === id) || {}).nombre })),
+    })),
+  };
 }
 
 function renderTicket(flashId) {
-  const { total, unidades } = totales();
+  const { total, normal, sets, unidades } = totales();
   if (carrito.length === 0) {
     $('#ticket-items').html(`
       <div class="empty" style="padding-top:60px">
@@ -418,7 +447,7 @@ function renderTicket(flashId) {
           </div>
           <button type="button" class="btn-icon danger js-quitar" title="Quitar"><i class="bi bi-x-lg"></i></button>
         </div>
-      </div>`).join(''));
+      </div>`).join('') + combosHtml(sets, normal - total));
   }
   $('#sum-unidades').text(App.num(unidades));
   $('#sum-total').text(App.money(total));
@@ -428,6 +457,18 @@ function renderTicket(flashId) {
   $('#mb-unidades').text(`${App.num(unidades)} unidad${unidades === 1 ? '' : 'es'}`);
   guardarCarrito();
   publicarCliente(flashId);
+}
+
+function combosHtml(sets, ahorro) {
+  if (!sets.length) return '';
+  const lineas = App.lineasBoleta(ventaDelCarrito(sets)).filter(l => l.tipo === 'conjunto');
+  return `<div class="combo-box">
+      ${lineas.map(l => `<div class="combo-row">
+        <div><i class="bi bi-stars me-1"></i><strong>${l.cantidad > 1 ? l.cantidad + ' × ' : ''}${App.esc(l.nombre)}</strong> · T. ${App.esc(l.talla)}
+          <div class="t-sub">${App.esc(l.detalle)}</div></div>
+        <strong class="tabular">${App.money(l.subtotal)}</strong></div>`).join('')}
+      <div class="combo-ahorro">Precio de conjunto aplicado (${App.money(ahorro)} menos que por separado)</div>
+    </div>`;
 }
 
 /* ---------- Búsqueda / escáner ---------- */
@@ -564,7 +605,7 @@ $('#btn-confirmar').on('click', function () {
   }).done(function (res) {
     // El total oficial es el que calcula el servidor con los precios de la base de datos
     const totalServidor = typeof res.total === 'number' ? res.total : total;
-    ultimaVenta = { id: res.venta_id, fecha: new Date(), total: totalServidor, items, metodo_pago: metodo, recibido, vuelto: recibido !== null ? recibido - totalServidor : null };
+    ultimaVenta = Object.assign({}, res.venta, { fecha: new Date(res.venta.fecha), recibido, vuelto: recibido !== null ? recibido - totalServidor : null });
     $('#exito-metodo').text(App.METODOS_PAGO[metodo].nombre);
     $('#link-boleta').attr('href', "{% url 'boleta' 0 %}".replace('/0/', '/' + res.venta_id + '/'));
     faseCliente = 'gracias';
@@ -612,13 +653,23 @@ try { clienteVisible = localStorage.getItem(KEY_VISIBLE) !== '0'; } catch (e) {}
 
 function publicarCliente(ultimoId) {
   if (!canalCliente) return;
-  const { total, unidades } = totales();
+  const { total, unidades, sets } = totales();
   const raw = $('#monto-recibido').val();
+  // Lo que ve el cliente: los conjuntos como un ítem con su precio (sin mostrar descuentos)
+  const venta = ventaDelCarrito(sets);
+  const lineas = App.lineasBoleta(venta).map((l, i) => {
+    const conjunto = l.tipo === 'conjunto' ? venta.conjuntos.find(c => c.nombre === l.nombre && c.talla === l.talla) : null;
+    const contiene = conjunto && conjunto.piezas.some(p => p.inventario_id === ultimoId);
+    const id = l.tipo === 'conjunto' ? (contiene ? ultimoId : 'c' + i)
+      : (carrito.find(c => c.nombre === l.nombre && c.talla === l.talla && c.colegio === l.colegio) || {}).id;
+    return { id, nombre: l.nombre, talla: l.talla, colegio: l.tipo === 'conjunto' ? l.detalle : l.colegio,
+             precio: l.precio, cantidad: l.cantidad, subtotal: l.subtotal };
+  });
   canalCliente.postMessage({
     tipo: 'estado',
     visible: clienteVisible,
     fase: faseCliente,
-    items: carrito.map(c => ({ id: c.id, nombre: c.nombre, talla: c.talla, colegio: c.colegio, precio: c.precio, cantidad: c.cantidad, subtotal: c.precio * c.cantidad })),
+    items: lineas,
     total, unidades,
     ultimoId: ultimoId || null,
     recibido: faseCliente === 'cobro' && metodoPago === 'efectivo' && raw !== '' ? Number(raw) : null,

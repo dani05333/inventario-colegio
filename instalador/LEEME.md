@@ -43,7 +43,9 @@ No pide permisos de administrador ni instala nada más (trae su propio Python).
    - **Tag:** `v1.1.0` (el mismo número de `VERSION`, con una `v` delante)
    - **Título:** `Chloe POS 1.1.0`
    - **Descripción:** las novedades, en palabras simples (el cliente las ve antes de actualizar)
+   - **Target:** la rama donde está el código de esa versión (hoy `rediseno-pos`)
    - **Adjunta los dos archivos** de `instalador/salida/` (el `.exe` y el `.sha256`)
+   - **Release label: Latest** ← importante: con "None" GitHub no la marca como la más reciente y el POS no la ve
    - **Publish release**
 
 En el POS, la próxima vez que abran el programa aparece un aviso, y en **Sistema → Buscar actualizaciones → Actualizar ahora** se instala sola (hace un respaldo antes).

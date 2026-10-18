@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+{% block title %}{% if conjunto %}Editar{% else %}Nuevo{% endif %} conjunto{% endblock %}
+{% block page_title %}Conjuntos{% endblock %}
+{% block page_subtitle %}{% if conjunto %}Editando «{{ conjunto.nombre }}»{% else %}Nuevo conjunto{% endif %}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .chk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+  .chk-grid label {
+    display: flex; align-items: center; gap: 10px; margin: 0; padding: 10px 12px; cursor: pointer;
+    border: 1px solid var(--border-strong); border-radius: 10px; font-weight: 500; color: var(--text);
+  }
+  .chk-grid label:has(input:checked) { border-color: var(--primary); background: var(--primary-50); }
+  .chk-grid input { width: 18px; height: 18px; accent-color: var(--primary); }
+  .tallas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+  .peso input { padding-left: 1.6rem !important; }
+  .peso { position: relative; }
+  .peso::before { content: "$"; position: absolute; left: .7rem; top: 50%; transform: translateY(-50%); color: var(--muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="form-shell" style="max-width:820px">
+  <a href="{% url 'ver_conjuntos' %}" class="d-inline-flex align-items-center gap-1 mb-3 text-secondary"><i class="bi bi-arrow-left"></i> Volver a conjuntos</a>
+  <form method="post" class="app-form" novalidate>
+    {% csrf_token %}
+    <div class="panel mb-3">
+      <div class="panel-header"><div><h2 class="panel-title">Conjunto</h2><p class="panel-sub">Nombre, colegio y las prendas que lo forman</p></div></div>
+      <div class="panel-body">
+        {{ form.non_field_errors }}
+        <div class="row g-3">
+          <div class="col-md-7">
+            <label for="{{ form.nombre.id_for_label }}">Nombre</label>
+            {{ form.nombre }}{{ form.nombre.errors }}
+            <div class="field-help">Así aparece en la boleta. Por ejemplo: «Buzo completo».</div>
+          </div>
+          <div class="col-md-5">
+            <label for="{{ form.colegio.id_for_label }}">Colegio</label>
+            {{ form.colegio }}{{ form.colegio.errors }}
+          </div>
+          <div class="col-12">
+            <label>Prendas del conjunto</label>
+            <div class="chk-grid">
+              {% for chk in form.componentes %}<label>{{ chk.tag }} {{ chk.choice_label }}</label>{% endfor %}
+            </div>
+            {{ form.componentes.errors }}
+            <div class="field-help">Se arma el conjunto cuando en la venta están todas estas prendas (cualquier color).</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header"><div><h2 class="panel-title">Precio</h2><p class="panel-sub">Un precio general y, si quieres, precios distintos para algunas tallas</p></div></div>
+      <div class="panel-body">
+        <div class="row g-3 mb-3">
+          <div class="col-md-5">
+            <label for="{{ form.precio.id_for_label }}">Precio general del conjunto</label>
+            <div class="peso">{{ form.precio }}</div>{{ form.precio.errors }}
+          </div>
+          <div class="col-md-7 d-flex align-items-end">
+            <label class="d-flex align-items-center gap-2 m-0" style="font-weight:500">{{ form.activo }} Conjunto activo (se aplica en el punto de venta)</label>
+          </div>
+        </div>
+        <label>Precio por talla <span class="fw-normal text-secondary">(opcional: deja en blanco para usar el precio general)</span></label>
+        {% if error_precios %}<div class="field-error mb-2">{{ error_precios }}</div>{% endif %}
+        <div class="tallas-grid">
+          {% for talla, precio in filas_tallas %}
+          <div>
+            <div class="small text-secondary mb-1">Talla {{ talla }}</div>
+            <div class="peso"><input type="text" inputmode="numeric" name="precio_talla_{{ talla.id }}" value="{{ precio|default_if_none:''|floatformat:0 }}" class="form-control" placeholder="General"></div>
+          </div>
+          {% empty %}
+          <div class="text-secondary small">Aún no hay tallas creadas.</div>
+          {% endfor %}
+        </div>
+        <div class="field-help mt-2">Si las prendas vendidas son de tallas distintas, se usa el precio más alto de esas tallas.</div>
+      </div>
+      <div class="modal-footer justify-content-between">
+        <a href="{% url 'ver_conjuntos' %}" class="btn btn-light-border">Cancelar</a>
+        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Guardar conjunto</button>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}

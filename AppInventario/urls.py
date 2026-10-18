@@ -22,6 +22,18 @@ urlpatterns = [
     path('uniformes/eliminar/<int:pk>', views.UniformeDeleteView.as_view(), name='eliminar_uniforme'),
     path('api/uniformes/',views.uniformes_json, name='uniformes_json'),
 
+    path('colores/', views.ver_colores, name='ver_colores'),
+    path('colores/nuevo/', views.ColorCreateView.as_view(), name='crear_color'),
+    path('colores/editar/<int:pk>', views.ColorUpdateView.as_view(), name='editar_color'),
+    path('colores/eliminar/<int:pk>', views.ColorDeleteView.as_view(), name='eliminar_color'),
+    path('api/colores/', views.colores_json, name='colores_json'),
+
+    path('conjuntos/', views.ver_conjuntos, name='ver_conjuntos'),
+    path('conjuntos/nuevo/', views.editar_conjunto, name='crear_conjunto'),
+    path('conjuntos/editar/<int:pk>', views.editar_conjunto, name='editar_conjunto'),
+    path('conjuntos/eliminar/<int:pk>', views.ConjuntoDeleteView.as_view(), name='eliminar_conjunto'),
+    path('api/conjuntos/', views.conjuntos_activos, name='conjuntos_activos'),
+
     path('inventario/', views.ver_inventario, name='ver_inventario'),
     path('inventario/nuevo/', views.InventarioCreateView.as_view(), name='crear_inventario'),
     path('inventario/editar/<int:pk>', views.InventarioUpdateView.as_view(), name='editar_inventario'),

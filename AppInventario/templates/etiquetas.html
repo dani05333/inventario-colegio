@@ -149,9 +149,9 @@ function cargarPrefs() {
 function cargar() {
   return $.getJSON("{% url 'inventario_json' %}").then(res => {
     productos = res.data.map(p => ({
-      id: p.id, codigo: String(p.codigo_barras ?? ''), nombre: p.uniforme, talla: p.talla,
+      id: p.id, codigo: String(p.codigo_barras ?? ''), nombre: p.nombre, talla: p.talla,
       colegio: p.colegio, precio: p.precio_unitario, stock: p.cantidad,
-      _q: `${p.uniforme} ${p.talla} ${p.colegio} ${p.codigo_barras}`.toLowerCase()
+      _q: `${p.nombre} ${p.talla} ${p.colegio} ${p.codigo_barras}`.toLowerCase()
     })).sort((a, b) => (a.colegio + a.nombre + a.talla).localeCompare(b.colegio + b.nombre + b.talla, 'es', { numeric: true }));
 
     const sel = $('#f-colegio');

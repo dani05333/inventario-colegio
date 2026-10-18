@@ -155,13 +155,17 @@ const ventas = JSON.parse(document.getElementById('ventas-data').textContent).ma
 // Datos que necesita la boleta (imprimir / PDF)
 function paraBoleta(v) {
   return { id: v.id, fecha: v.fechaObj, total: v.total, items: v.items, metodo_pago: v.metodo_pago,
-           anulada: v.anulada, fecha_anulacion: v.fecha_anulacion, motivo_anulacion: v.motivo_anulacion };
+           anulada: v.anulada, fecha_anulacion: v.fecha_anulacion, motivo_anulacion: v.motivo_anulacion,
+           conjuntos: v.conjuntos };
 }
 
 function detalleHtml(v) {
   const nota = v.anulada ? `<div class="nota-anulada"><i class="bi bi-x-octagon-fill me-1"></i>
       <strong>Anulada</strong> el ${App.esc(App.formatDateTime(v.fecha_anulacion))} · ${App.esc(v.motivo_anulacion || 'sin motivo')}</div>` : '';
-  return `<div class="detail-wrap">${nota}<table class="detail-table">
+  const combos = (v.conjuntos || []).length ? `<div class="mt-2 mb-1 small">${v.conjuntos.map(c =>
+      `<div><i class="bi bi-stars text-primary me-1"></i><strong>${App.esc(c.nombre)}</strong> · T. ${App.esc(c.talla)} · ${App.money(c.precio)}
+       <span class="text-secondary">(${App.esc(c.piezas.map(p => p.nombre).join(' + '))})</span></div>`).join('')}</div>` : '';
+  return `<div class="detail-wrap">${nota}${combos}<table class="detail-table">
     <thead><tr><th>Producto</th><th>Colegio</th><th class="text-end">Cant.</th><th class="text-end">Precio</th><th class="text-end">Subtotal</th></tr></thead>
     <tbody>${v.items.map(i => `<tr>
       <td><strong>${App.esc(i.nombre)}</strong> <span class="badge-soft badge-muted ms-1">${App.esc(i.talla)}</span></td>

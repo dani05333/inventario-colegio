@@ -73,12 +73,87 @@ const App = (function () {
     return scriptsCargados[src];
   }
 
+  /* ---------- Conjuntos (copia de AppInventario/conjuntos.py: mantener ambas iguales) ----------
+     lineas: [{id, uniforme_id, talla_id, colegio_id, precio, cantidad}]; conjuntos: los de /api/conjuntos/
+     Devuelve { sets: [{conjunto_id, nombre, precio, piezas: [linea_id], tallas: [talla_id]}], cobrado: {linea_id: monto} } */
+  function armarConjuntos(lineas, conjuntos) {
+    const unidades = [];
+    lineas.forEach(l => { for (let i = 0; i < l.cantidad; i++) unidades.push({ ...l, usada: false }); });
+    const sets = [];
+    for (const c of conjuntos) {
+      for (;;) {
+        const armado = buscarSet(unidades, c);
+        if (!armado) break;
+        const normal = armado.piezas.reduce((a, u) => a + Number(u.precio), 0);
+        if (armado.precio >= normal) break;
+        armado.piezas.forEach(u => { u.usada = true; });
+        sets.push({ conjunto_id: c.id, nombre: c.nombre, precio: armado.precio,
+                    piezas: armado.piezas.map(u => u.id), tallas: armado.piezas.map(u => u.talla_id), _u: armado.piezas });
+      }
+    }
+    const cobrado = Object.fromEntries(lineas.map(l => [l.id, 0]));
+    unidades.forEach(u => { if (!u.usada) cobrado[u.id] += Number(u.precio); });
+    sets.forEach(s => {
+      const normal = s._u.reduce((a, u) => a + Number(u.precio), 0) || 1;
+      let repartido = 0;
+      s._u.forEach((u, i) => {
+        const parte = i === s._u.length - 1 ? s.precio - repartido : Math.round(s.precio * Number(u.precio) / normal);
+        repartido += parte;
+        cobrado[u.id] += parte;
+      });
+      delete s._u;
+    });
+    return { sets, cobrado };
+  }
+
+  function buscarSet(unidades, c) {
+    const libres = unidades.filter(u => !u.usada);
+    const primeras = libres.filter(u => u.uniforme_id === c.componentes[0] && (c.colegio_id === null || u.colegio_id === c.colegio_id));
+    for (const primera of primeras) {
+      let piezas = [primera];
+      for (const comp of c.componentes.slice(1)) {
+        const candidatas = libres.filter(u => u.uniforme_id === comp && u.colegio_id === primera.colegio_id && !piezas.includes(u));
+        if (!candidatas.length) { piezas = null; break; }
+        const misma = candidatas.filter(u => u.talla_id === primera.talla_id);
+        piezas.push((misma.length ? misma : candidatas)[0]);
+      }
+      if (piezas) {
+        const precios = piezas.map(u => c.precios_talla[String(u.talla_id)] ?? c.precio);
+        return { piezas, precio: Math.max(...precios) };
+      }
+    }
+    return null;
+  }
+
+  /* Líneas para mostrar al cliente (boleta / pantalla del cliente): cada conjunto es un ítem con su
+     precio y sus piezas; el resto de los productos, con su precio normal. Nunca se muestra "descuento". */
+  function lineasBoleta(venta) {
+    const usadas = {};
+    (venta.conjuntos || []).forEach(c => c.piezas.forEach(p => { usadas[p.inventario_id] = (usadas[p.inventario_id] || 0) + 1; }));
+    const conjuntos = (venta.conjuntos || []).map(c => ({
+      tipo: 'conjunto', nombre: c.nombre, talla: c.talla, cantidad: 1, precio: c.precio, subtotal: c.precio,
+      detalle: c.piezas.map(p => p.nombre).join(' + '),
+    }));
+    // Conjuntos iguales (mismo nombre, talla y piezas) se agrupan: "2 x $10.000"
+    const agrupados = [];
+    conjuntos.forEach(c => {
+      const igual = agrupados.find(a => a.nombre === c.nombre && a.talla === c.talla && a.detalle === c.detalle && a.precio === c.precio);
+      if (igual) { igual.cantidad++; igual.subtotal += c.precio; } else agrupados.push(c);
+    });
+    const sueltos = venta.items.map(i => {
+      const cant = i.cantidad - (usadas[i.inventario_id] || 0);
+      return cant > 0 ? { tipo: 'item', nombre: i.nombre, talla: i.talla, colegio: i.colegio, cantidad: cant, precio: i.precio, subtotal: cant * i.precio } : null;
+    }).filter(Boolean);
+    return agrupados.concat(sueltos);
+  }
+
   /* ---------- Boleta ----------
-     venta = { id, fecha, total, items: [{nombre, talla, colegio, cantidad, precio, subtotal}], recibido?, vuelto? } */
+     venta = { id, fecha, total, items: [{inventario_id, nombre, talla, colegio, cantidad, precio, subtotal}],
+               conjuntos?: [...], recibido?, vuelto? } */
   function receiptHtml(venta) {
-    const rows = venta.items.map(i => `
+    const rows = lineasBoleta(venta).map(i => `
       <tr><td colspan="2"><strong>${esc(i.nombre)} · T. ${esc(i.talla)}</strong></td></tr>
-      <tr><td>&nbsp;&nbsp;${i.cantidad} x ${money(i.precio)}<br>&nbsp;&nbsp;<small>${esc(i.colegio)}</small></td><td class="r">${money(i.subtotal)}</td></tr>`).join('');
+      <tr><td>&nbsp;&nbsp;${i.cantidad} x ${money(i.precio)}<br>&nbsp;&nbsp;<small>${esc(i.tipo === 'conjunto' ? i.detalle : i.colegio)}</small></td><td class="r">${money(i.subtotal)}</td></tr>`).join('');
     // La forma de pago no se imprime en la boleta; solo el vuelto cuando se pagó en efectivo
     const pago = venta.recibido ? `
       <tr><td>Recibido</td><td class="r">${money(venta.recibido)}</td></tr>
@@ -183,7 +258,7 @@ const App = (function () {
 
   return {
     money, num, esc, toast, formatDateTime, dtLanguage, loadScript, METODOS_PAGO,
-    receiptHtml, printReceipt, downloadReceipt,
+    receiptHtml, printReceipt, downloadReceipt, armarConjuntos, lineasBoleta,
     JSBARCODE_URL, renderBarcode, esEan13, codigoValido
   };
 })();

@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block title %}Conjuntos{% endblock %}
+{% block page_title %}Conjuntos{% endblock %}
+{% block page_subtitle %}Prendas que, vendidas juntas, tienen un precio especial{% endblock %}
+{% block topbar_actions %}
+<a href="{% url 'crear_conjunto' %}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Nuevo conjunto</a>
+{% endblock %}
+
+{% block content %}
+<div class="panel mb-3" style="max-width:1000px">
+  <div class="panel-body small text-secondary">
+    <i class="bi bi-info-circle me-1"></i>
+    En el punto de venta se escanean las prendas como siempre. Cuando están todas las de un conjunto (del mismo colegio),
+    se cobra el precio del conjunto automáticamente y cada prenda descuenta su propio stock. En la boleta aparece como
+    un solo ítem con su precio.
+  </div>
+</div>
+
+<div class="panel" style="max-width:1000px">
+  {% if conjuntos %}
+  <table class="table-app">
+    <thead>
+      <tr><th>Conjunto</th><th>Prendas</th><th>Colegio</th><th class="num">Precio</th><th></th><th class="text-end"></th></tr>
+    </thead>
+    <tbody>
+      {% for c in conjuntos %}
+      <tr>
+        <td><span class="cell-strong">{{ c.nombre }}</span></td>
+        <td>{% for u in c.componentes.all %}<span class="badge-soft badge-muted me-1">{{ u }}</span>{% endfor %}</td>
+        <td>{{ c.colegio|default:"Todos" }}</td>
+        <td class="num">
+          <strong>${{ c.precio|floatformat:0|intcomma }}</strong>
+          {% if c.precios_talla.all %}
+          <div class="cell-sub">
+            {% for p in c.precios_talla.all %}T. {{ p.talla }}: ${{ p.precio|floatformat:0|intcomma }}{% if not forloop.last %} · {% endif %}{% endfor %}
+          </div>
+          {% endif %}
+        </td>
+        <td>{% if c.activo %}<span class="badge-soft badge-ok">Activo</span>{% else %}<span class="badge-soft badge-muted">Pausado</span>{% endif %}</td>
+        <td class="text-end text-nowrap">
+          <a href="{% url 'editar_conjunto' c.id %}" class="btn-icon" title="Editar"><i class="bi bi-pencil"></i></a>
+          <a href="{% url 'eliminar_conjunto' c.id %}" class="btn-icon danger ms-1" title="Eliminar"><i class="bi bi-trash3"></i></a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">
+    <i class="bi bi-collection"></i>
+    <strong>Aún no hay conjuntos</strong>
+    Por ejemplo: «Buzo completo» = Polerón de buzo + Pantalón de buzo.
+    <div class="mt-3"><a href="{% url 'crear_conjunto' %}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Crear el primero</a></div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

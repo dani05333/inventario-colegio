@@ -13,23 +13,28 @@
       <div class="panel-header">
         <div>
           <h2 class="panel-title">Producto</h2>
-          <p class="panel-sub">Qué prenda es, de qué colegio y en qué talla.</p>
+          <p class="panel-sub">Qué prenda es, de qué color, de qué colegio y en qué talla.</p>
         </div>
       </div>
       <div class="panel-body">
         {{ form.non_field_errors }}
         <div class="row g-3">
-          <div class="col-md-5">
+          <div class="col-md-4">
             <label for="{{ form.uniforme.id_for_label }}">Uniforme</label>
             {{ form.uniforme }}{{ form.uniforme.errors }}
             <div class="field-help"><a href="{% url 'crear_uniforme' %}"><i class="bi bi-plus"></i>Nuevo uniforme</a></div>
           </div>
-          <div class="col-md-4">
+          <div class="col-md-3">
+            <label for="{{ form.color.id_for_label }}">Color <span class="fw-normal text-secondary">(opcional)</span></label>
+            {{ form.color }}{{ form.color.errors }}
+            <div class="field-help"><a href="{% url 'crear_color' %}"><i class="bi bi-plus"></i>Nuevo color</a></div>
+          </div>
+          <div class="col-md-3">
             <label for="{{ form.colegio.id_for_label }}">Colegio</label>
             {{ form.colegio }}{{ form.colegio.errors }}
             <div class="field-help"><a href="{% url 'crear_colegio' %}"><i class="bi bi-plus"></i>Nuevo colegio</a></div>
           </div>
-          <div class="col-md-3">
+          <div class="col-md-2">
             <label for="{{ form.talla.id_for_label }}">Talla</label>
             {{ form.talla }}{{ form.talla.errors }}
             <div class="field-help"><a href="{% url 'crear_talla' %}"><i class="bi bi-plus"></i>Nueva talla</a></div>
