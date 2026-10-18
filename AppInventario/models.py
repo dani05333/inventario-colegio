@@ -1,47 +1,61 @@
+from django.core.validators import MinValueValidator
 from django.db import models
+
+# Montos en pesos, sin decimales. Mismo tipo en todos los modelos para no mezclar enteros y decimales.
+MONTO = dict(max_digits=12, decimal_places=0, validators=[MinValueValidator(0)])
+
 
 class Colegio(models.Model):
     nombre = models.CharField(max_length=100)
-    
+
     def __str__(self):
         return self.nombre
 
 class Talla(models.Model):
     nombre = models.CharField(max_length=100)
-    
+
     def __str__(self):
         return self.nombre
-    
+
 class Uniforme(models.Model):
     nombre = models.CharField(max_length=100)
-    
-    
+
+
     def __str__(self):
         return self.nombre
-    
+
 class Inventario(models.Model):
-    codigo_barras = models.CharField(max_length=50, unique=True, default=0)
+    codigo_barras = models.CharField(max_length=50, unique=True)
     cantidad = models.PositiveIntegerField()
-    colegio = models.ForeignKey(Colegio, on_delete=models.CASCADE)
-    talla = models.ForeignKey(Talla, on_delete=models.CASCADE)
-    uniforme = models.ForeignKey(Uniforme, on_delete=models.CASCADE)
-    precio = models.PositiveIntegerField(default=0)
-    
+    # PROTECT: no se puede borrar un colegio/talla/uniforme que tenga productos asociados
+    colegio = models.ForeignKey(Colegio, on_delete=models.PROTECT)
+    talla = models.ForeignKey(Talla, on_delete=models.PROTECT)
+    uniforme = models.ForeignKey(Uniforme, on_delete=models.PROTECT)
+    precio = models.DecimalField(default=0, **MONTO)
+
     def __str__(self):
         return f"{self.uniforme} - {self.talla} - {self.colegio}"
-    
+
     @property
     def precio_total(self):
         return self.cantidad * self.precio
-    
+
 class Venta(models.Model):
+    METODOS_PAGO = [
+        ('efectivo', 'Efectivo'),
+        ('debito', 'Débito'),
+        ('credito', 'Crédito'),
+        ('transferencia', 'Transferencia'),
+    ]
+
     fecha = models.DateTimeField(auto_now_add=True)
-    total = models.DecimalField(max_digits=10, decimal_places=2)
+    total = models.DecimalField(**MONTO)
+    metodo_pago = models.CharField(max_length=20, choices=METODOS_PAGO, default='efectivo')
 
 class DetalleVenta(models.Model):
     venta = models.ForeignKey(Venta, on_delete=models.CASCADE)
-    inventario = models.ForeignKey(Inventario, on_delete=models.CASCADE)
+    # PROTECT: un producto con ventas no se puede borrar, así el historial queda completo
+    inventario = models.ForeignKey(Inventario, on_delete=models.PROTECT)
     cantidad = models.PositiveIntegerField()
-    precio_unitario = models.DecimalField(max_digits=10, decimal_places=2)  
-    subtotal = models.DecimalField(max_digits=10, decimal_places=2, default=0)         
-
+    precio_unitario = models.DecimalField(**MONTO)
+    subtotal = models.DecimalField(default=0, **MONTO)

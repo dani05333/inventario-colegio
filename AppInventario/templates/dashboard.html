@@ -1,247 +1,334 @@
-{% extends 'inicio.html' %}
+{% extends 'base.html' %}
+{% block title %}Análisis{% endblock %}
+{% block page_title %}Análisis de ventas{% endblock %}
+{% block page_subtitle %}Cómo va el negocio{% endblock %}
+{% block topbar_actions %}
+<a href="{% url 'punto_de_venta' %}" class="btn btn-primary d-none d-sm-inline-flex align-items-center"><i class="bi bi-upc-scan me-2"></i>Ir a vender</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+  .seg { display: inline-flex; background: var(--surface); border: 1px solid var(--border); border-radius: 11px; padding: 3px; flex-wrap: wrap; }
+  .seg button { border: 0; background: transparent; padding: 6px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+  .seg button.active { background: var(--primary-50); color: var(--primary); }
+  .seg-label { font-size: 12px; color: var(--muted); font-weight: 600; margin-right: 6px; }
+
+  .chart-wrap { position: relative; height: 340px; }
+
+  .rank { list-style: none; margin: 0; padding: 6px 0; }
+  .rank li { padding: 10px 20px; }
+  .rank .r-top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+  .rank .r-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rank .r-val { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+  .rank .r-sub { font-size: 12.5px; color: var(--muted); display: flex; justify-content: space-between; gap: 10px; }
+  .rank .r-track { height: 8px; background: var(--surface-2); border-radius: 4px; margin: 7px 0 5px; overflow: hidden; }
+  .rank .r-bar { height: 100%; background: var(--primary); border-radius: 0 4px 4px 0; min-width: 4px; }
+  .rank-num { width: 22px; height: 22px; border-radius: 7px; display: inline-grid; place-items: center; font-size: 12px; font-weight: 700; background: var(--surface-2); color: var(--text-2); margin-right: 8px; flex: none; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container my-5">
-    <h2 class="mb-4 text-center">📊 Analisis de Ventas</h2>
-
-    <!-- KPIs -->
-    <div class="row text-center mb-5">
-        <div class="col-md-3 mb-3">
-            <div class="card shadow-lg rounded-4 border-0">
-                <div class="card-body bg-primary text-white rounded-4">
-                    <h6 class="fw-bold">Ventas Totales</h6>
-                    <h3 id="kpi-ventas" class="fw-bolder">$0</h3>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3 mb-3">
-            <div class="card shadow-lg rounded-4 border-0">
-                <div class="card-body bg-success text-white rounded-4">
-                    <h6 class="fw-bold">Productos Vendidos</h6>
-                    <h3 id="kpi-productos" class="fw-bolder">0</h3>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3 mb-3">
-            <div class="card shadow-lg rounded-4 border-0">
-                <div class="card-body bg-warning text-dark rounded-4">
-                    <h6 class="fw-bold">Producto más vendido</h6>
-                    <h5 id="kpi-top-producto" class="fw-bolder">N/A</h5>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3 mb-3">
-            <div class="card shadow-lg rounded-4 border-0">
-                <div class="card-body bg-danger text-white rounded-4">
-                    <h6 class="fw-bold">Ticket Promedio</h6>
-                    <h3 id="kpi-ticket" class="fw-bolder">$0</h3>
-                </div>
-            </div>
-        </div>
+<!-- Filtros -->
+<div class="d-flex flex-wrap gap-3 align-items-center mb-4">
+  <div class="d-flex align-items-center flex-wrap gap-2">
+    <div class="seg" id="presets">
+      <button data-p="hoy">Hoy</button>
+      <button data-p="7">7 días</button>
+      <button data-p="30" class="active">30 días</button>
+      <button data-p="mes">Este mes</button>
+      <button data-p="anio">Este año</button>
     </div>
-
-    <!-- Filtros -->
-    <div class="row align-items-end mb-5">
-        <div class="col-md-3 mb-2">
-            <label class="form-label fw-bold">Rango</label>
-            <select id="filtro-rango" class="form-select rounded-3 shadow-sm">
-                <option value="dia">Día</option>
-                <option value="semana">Semana</option>
-                <option value="mes">Mes</option>
-            </select>
-        </div>
-        <div class="col-md-3 mb-2">
-            <label class="form-label fw-bold">Desde</label>
-            <input type="date" id="fecha-inicio" class="form-control rounded-3 shadow-sm">
-        </div>
-        <div class="col-md-3 mb-2">
-            <label class="form-label fw-bold">Hasta</label>
-            <input type="date" id="fecha-fin" class="form-control rounded-3 shadow-sm">
-        </div>
-        <div class="col-md-3 mb-2">
-            <button id="btn-filtrar" class="btn btn-primary w-100 rounded-3 shadow">Filtrar</button>
-        </div>
+    <div class="d-flex align-items-center gap-2">
+      <input type="date" id="fecha-inicio" class="form-control" style="width:auto" aria-label="Desde">
+      <span class="text-secondary">a</span>
+      <input type="date" id="fecha-fin" class="form-control" style="width:auto" aria-label="Hasta">
     </div>
-
-    <!-- Gráficos -->
-    <div class="row mb-5">
-        <div class="col-md-8 mb-4">
-            <div class="card shadow rounded-4">
-                <div class="card-body">
-                    <h6 class="fw-bold mb-3">Evolución de Ventas</h6>
-                    <canvas id="ventas-line-chart" height="180"></canvas>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4 mb-4">
-            <div class="card shadow rounded-4">
-                <div class="card-body">
-                    <h6 class="fw-bold mb-3">Top Productos</h6>
-                    <canvas id="productos-torta-chart" height="220"></canvas>
-                </div>
-            </div>
-        </div>
+  </div>
+  <div class="d-flex align-items-center ms-lg-auto">
+    <span class="seg-label">Agrupar por</span>
+    <div class="seg" id="agrupar">
+      <button data-r="dia" class="active">Día</button>
+      <button data-r="semana">Semana</button>
+      <button data-r="mes">Mes</button>
     </div>
+  </div>
+</div>
 
-    <!-- Secciones de Stock y Tendencias -->
-    <div class="row">
-        <div class="col-md-6 mb-4">
-            <div class="card shadow rounded-4">
-                <div class="card-header bg-danger text-white rounded-top-4">
-                    <h6 class="mb-0 fw-bold">⚠️ Productos con Stock Bajo</h6>
-                </div>
-                <div class="card-body">
-                    <ul id="lista-stock-bajo" class="list-group list-unstyled list-group-flush">
-                        <!-- JS insertará aquí -->
-                    </ul>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6 mb-4">
-            <div class="card shadow rounded-4">
-                <div class="card-header bg-warning text-dark rounded-top-4">
-                    <h6 class="mb-0 fw-bold">📈 Productos en Tendencia</h6>
-                </div>
-                <div class="card-body">
-                    <ul id="lista-productos-tendencia" class="list-group list-unstyled list-group-flush">
-                        <!-- JS insertará aquí -->
-                    </ul>
-                </div>
-            </div>
-        </div>
+<!-- KPIs -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="stat">
+      <div class="stat-top"><span class="stat-label">Ingresos</span><span class="stat-icon"><i class="bi bi-currency-dollar"></i></span></div>
+      <div class="stat-value" id="kpi-ventas">$0</div>
+      <div class="stat-foot" id="kpi-periodo">—</div>
     </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat">
+      <div class="stat-top"><span class="stat-label">Boletas</span><span class="stat-icon"><i class="bi bi-receipt"></i></span></div>
+      <div class="stat-value" id="kpi-boletas">0</div>
+      <div class="stat-foot">ventas realizadas</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat">
+      <div class="stat-top"><span class="stat-label">Unidades vendidas</span><span class="stat-icon"><i class="bi bi-bag-check"></i></span></div>
+      <div class="stat-value" id="kpi-productos">0</div>
+      <div class="stat-foot" id="kpi-upv">—</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat">
+      <div class="stat-top"><span class="stat-label">Ticket promedio</span><span class="stat-icon"><i class="bi bi-calculator"></i></span></div>
+      <div class="stat-value" id="kpi-ticket">$0</div>
+      <div class="stat-foot">por boleta</div>
+    </div>
+  </div>
+</div>
+
+<!-- Gráfico + ranking -->
+<div class="row g-3 mb-4">
+  <div class="col-xl-8">
+    <div class="panel h-100">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title" id="chart-title">Ventas por día</h2>
+          <p class="panel-sub">Monto vendido en cada período</p>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="chart-wrap">
+          <canvas id="ventas-chart" role="img" aria-label="Gráfico de ventas por período"></canvas>
+        </div>
+        <div class="empty d-none" id="chart-empty" style="position:relative;margin-top:-340px;height:340px;padding-top:120px">
+          <i class="bi bi-bar-chart"></i>
+          <strong>Sin ventas en este período</strong>
+          Prueba con un rango de fechas más amplio.
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-4">
+    <div class="panel h-100">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title">Más vendidos</h2>
+          <p class="panel-sub">Unidades vendidas en el período</p>
+        </div>
+      </div>
+      <ul class="rank" id="ranking"></ul>
+    </div>
+  </div>
+</div>
+
+<!-- Stock y tendencias -->
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="panel h-100">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title"><i class="bi bi-exclamation-triangle text-warning me-1"></i>Stock bajo</h2>
+          <p class="panel-sub">Productos con menos de 10 unidades</p>
+        </div>
+        <a href="{% url 'ver_inventario' %}?stock=bajo" class="btn btn-sm btn-soft">Ver inventario</a>
+      </div>
+      <ul class="list-clean" id="lista-stock-bajo" style="max-height:340px;overflow:auto"></ul>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="panel h-100">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title"><i class="bi bi-graph-up-arrow text-success me-1"></i>En tendencia</h2>
+          <p class="panel-sub">Últimos 7 días vs. los 7 anteriores</p>
+        </div>
+      </div>
+      <ul class="list-clean" id="lista-tendencia"></ul>
+    </div>
+  </div>
 </div>
 {% endblock %}
 
-
 {% block extra_scripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
-let lineChart;
-let tortaChart;
+const COLOR = { primary: '#6250d6', grid: '#eceef3', axis: '#868c9c', text: '#151821' };
+const EDIT_URL = "{% url 'editar_inventario' 0 %}";
+const titulos ={ dia: 'Ventas por día', semana: 'Ventas por semana', mes: 'Ventas por mes' };
+let chart;
+let rango = 'dia';
 
-function fetchVentasData(){
-    let inicio = $('#fecha-inicio').val();
-    let fin = $('#fecha-fin').val();
-    let rango = $('#filtro-rango').val();
+function iso(d) { const z = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`; }
+function parseISO(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
 
-    if(rango === 'dia' && !inicio && !fin){
-        const hoy = new Date().toISOString().slice(0,10);
-        inicio = hoy;
-        fin = hoy;
-    }
+function etiqueta(s) {
+  const d = parseISO(s);
+  if (rango === 'mes') return d.toLocaleDateString('es-CL', { month: 'short', year: 'numeric' });
+  if (rango === 'semana') return 'Sem. ' + d.toLocaleDateString('es-CL', { day: 'numeric', month: 'short' });
+  return d.toLocaleDateString('es-CL', { day: 'numeric', month: 'short' });
+}
 
-    $.ajax({
-        url: "{% url 'ventas_data' %}",
-        data: {inicio: inicio, fin: fin, rango: rango},
-        success: function(data){
-            renderLineChart(data.fechas, data.montos);
-            renderTortaChart(data.productos);
+// Rellena los días sin ventas con 0 para que la serie sea continua
+function completarDias(fechas, montos, inicio, fin) {
+  if (rango !== 'dia' || !inicio || !fin) return { fechas, montos };
+  const mapa = Object.fromEntries(fechas.map((f, i) => [f, montos[i]]));
+  const out = { fechas: [], montos: [] };
+  for (let d = parseISO(inicio); d <= parseISO(fin); d.setDate(d.getDate() + 1)) {
+    const k = iso(d);
+    out.fechas.push(k);
+    out.montos.push(mapa[k] || 0);
+  }
+  return out;
+}
 
-            const totalVentas = data.total_ventas;
-            const totalProductos = data.productos.reduce((acc, p) => acc + p.cantidad, 0);
-            const topProducto = data.top_producto && data.top_producto.nombre !== 'N/A' 
-    ? `${data.top_producto.nombre} - ${data.top_producto.talla} - ${data.top_producto.colegio}` 
-    : 'N/A';
-            const ticketPromedio = (data.cantidad_ventas > 0) ? (totalVentas / data.cantidad_ventas).toFixed(0) : 0;
-
-            $('#kpi-ventas').text(`$${totalVentas.toLocaleString()}`);
-            $('#kpi-productos').text(totalProductos);
-            $('#kpi-top-producto').text(topProducto);
-            $('#kpi-ticket').text(`$${ticketPromedio}`);
+function renderChart(fechas, montos) {
+  const vacio = montos.every(m => !m);
+  $('#chart-empty').toggleClass('d-none', !vacio);
+  $('#chart-title').text(titulos[rango]);
+  if (chart) chart.destroy();
+  chart = new Chart(document.getElementById('ventas-chart'), {
+    type: 'bar',
+    data: {
+      labels: fechas.map(etiqueta),
+      datasets: [{
+        label: 'Ventas',
+        data: montos,
+        backgroundColor: COLOR.primary,
+        hoverBackgroundColor: '#5140c2',
+        borderRadius: { topLeft: 4, topRight: 4 },
+        borderSkipped: 'bottom',
+        maxBarThickness: 28,
+        categoryPercentage: .8,
+        barPercentage: .9
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1c1f2b', padding: 10, cornerRadius: 10, displayColors: false,
+          titleFont: { family: 'Inter', weight: '600' }, bodyFont: { family: 'Inter' },
+          callbacks: { label: ctx => App.money(ctx.parsed.y) }
         }
-    });
+      },
+      scales: {
+        x: { grid: { display: false }, border: { color: COLOR.grid }, ticks: { color: COLOR.axis, font: { family: 'Inter', size: 11 }, maxRotation: 0, autoSkipPadding: 12 } },
+        y: {
+          beginAtZero: true, border: { display: false }, grid: { color: COLOR.grid },
+          ticks: { color: COLOR.axis, font: { family: 'Inter', size: 11 }, maxTicksLimit: 6, callback: v => App.money(v) }
+        }
+      }
+    }
+  });
+}
+
+function renderRanking(productos) {
+  if (!productos.length) {
+    $('#ranking').html('<li class="empty"><i class="bi bi-trophy"></i><strong>Sin datos</strong>Aún no hay ventas en este período.</li>');
+    return;
+  }
+  const max = Math.max(...productos.map(p => p.cantidad));
+  $('#ranking').html(productos.map((p, i) => `
+    <li>
+      <div class="r-top">
+        <span class="r-name d-flex align-items-center"><span class="rank-num">${i + 1}</span>${App.esc(p.nombre)} · ${App.esc(p.talla)}</span>
+        <span class="r-val">${App.num(p.cantidad)} u.</span>
+      </div>
+      <div class="r-track"><div class="r-bar" style="width:${(p.cantidad / max) * 100}%"></div></div>
+      <div class="r-sub"><span class="text-truncate">${App.esc(p.colegio)}</span><span class="tabular">${App.money(p.total)}</span></div>
+    </li>`).join(''));
+}
+
+function fetchVentasData() {
+  const inicio = $('#fecha-inicio').val();
+  const fin = $('#fecha-fin').val();
+  $.getJSON("{% url 'ventas_data' %}", { inicio, fin, rango }).done(function (data) {
+    const serie = completarDias(data.fechas, data.montos, inicio, fin);
+    renderChart(serie.fechas, serie.montos);
+    renderRanking(data.productos.slice(0, 5));
+
+    const total = data.total_ventas;
+    const n = data.cantidad_ventas;
+    const u = data.unidades_vendidas;
+    $('#kpi-ventas').text(App.money(total));
+    $('#kpi-boletas').text(App.num(n));
+    $('#kpi-productos').text(App.num(u));
+    $('#kpi-upv').text(n ? `${(u / n).toLocaleString('es-CL', { maximumFractionDigits: 1 })} por boleta` : '—');
+    $('#kpi-ticket').text(App.money(n ? total / n : 0));
+    const fmt = s => parseISO(s).toLocaleDateString('es-CL', { day: 'numeric', month: 'short' });
+    $('#kpi-periodo').text(inicio && fin ? (inicio === fin ? fmt(inicio) : `${fmt(inicio)} – ${fmt(fin)}`) : 'todo el período');
+  }).fail(() => App.toast('No se pudieron cargar los datos de ventas', 'error'));
 }
 
 function fetchStockBajo() {
-    $.ajax({
-        url: "{% url 'stock_bajo' %}",
-        success: function(data){
-            let html = '';
-            data.productos.forEach(p => {
-                html += `<li>${p.nombre} - ${p.talla} - ${p.colegio} (Stock: ${p.stock})</li>`;
-            });
-            $('#lista-stock-bajo').html(html || '<li>No hay productos con stock bajo</li>');
-        }
-    });
+  $.getJSON("{% url 'stock_bajo' %}").done(function (data) {
+    const lista = data.productos.sort((a, b) => a.stock - b.stock);
+    $('#lista-stock-bajo').html(lista.length ? lista.map(p => `
+      <li>
+        <div class="grow">
+          <div class="title">${App.esc(p.nombre)} · ${App.esc(p.talla)}</div>
+          <div class="cell-sub">${App.esc(p.colegio)}</div>
+        </div>
+        ${p.stock <= 0
+          ? '<span class="badge-soft badge-danger"><i class="bi bi-x-circle"></i>Agotado</span>'
+          : `<span class="badge-soft badge-warn"><i class="bi bi-exclamation-circle"></i>${p.stock} u.</span>`}
+        <a href="${EDIT_URL.replace('/0', '/' + p.id)}" class="btn-icon" title="Reponer stock"><i class="bi bi-pencil"></i></a>
+      </li>`).join('')
+      : '<li class="empty d-block"><i class="bi bi-check2-circle"></i><strong>Todo en orden</strong>No hay productos con stock bajo.</li>');
+  });
 }
 
-function fetchProductosTendencia() {
-    $.ajax({
-        url: "{% url 'productos_tendencia' %}",
-        success: function(data){
-            let html = '';
-            data.productos.forEach(p => {
-                html += `<li>${p.nombre} - ${p.talla} - ${p.colegio} (+${p.crecimiento} ventas)</li>`;
-            });
-            $('#lista-productos-tendencia').html(html || '<li>No hay productos en tendencia</li>');
-        }
-    });
+function fetchTendencia() {
+  $.getJSON("{% url 'productos_tendencia' %}").done(function (data) {
+    $('#lista-tendencia').html(data.productos.length ? data.productos.map(p => `
+      <li>
+        <div class="grow">
+          <div class="title">${App.esc(p.nombre)} · ${App.esc(p.talla)}</div>
+          <div class="cell-sub">${App.esc(p.colegio)}</div>
+        </div>
+        <span class="badge-soft badge-ok"><i class="bi bi-arrow-up-right"></i>+${p.crecimiento} u.</span>
+      </li>`).join('')
+      : '<li class="empty d-block"><i class="bi bi-graph-up"></i><strong>Sin tendencias</strong>Ningún producto creció respecto a la semana anterior.</li>');
+  });
 }
 
-function renderLineChart(labels, dataPoints){
-    if(lineChart){ lineChart.destroy(); }
-    const ctx = document.getElementById('ventas-line-chart').getContext('2d');
-    lineChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Ventas ($)',
-                data: dataPoints,
-                backgroundColor: 'rgba(75, 192, 192, 0.7)',
-                borderColor: 'rgba(75, 192, 192, 1)',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            scales: { y: { beginAtZero: true } }
-        }
-    });
+function aplicarPreset(p) {
+  const hoy = new Date();
+  let d = new Date(hoy);
+  if (p === 'hoy') d = hoy;
+  else if (p === 'mes') d = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+  else if (p === 'anio') d = new Date(hoy.getFullYear(), 0, 1);
+  else d.setDate(hoy.getDate() - (Number(p) - 1));
+  $('#fecha-inicio').val(iso(d));
+  $('#fecha-fin').val(iso(hoy));
+  setRango(p === 'anio' ? 'mes' : 'dia');
 }
 
-function renderTortaChart(productos){
-    if(tortaChart){ tortaChart.destroy(); }
-    const ctx = document.getElementById('productos-torta-chart').getContext('2d');
-    const labels = productos.map(p => `${p.nombre} - ${p.talla} - ${p.colegio}`);
-    const datos = productos.map(p => p.cantidad);
-
-    tortaChart = new Chart(ctx, {
-        type: 'pie',
-        data: {
-            labels: labels,
-            datasets: [{
-                data: datos,
-                backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#8BC34A', '#FF9800', '#9C27B0']
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const index = context.dataIndex;
-                            const producto = productos[index];
-                            return [`${producto.nombre} - ${producto.talla} - ${producto.colegio}`, `Cantidad: ${producto.cantidad}`, `Total: $${producto.total}`];
-                        }
-                    }
-                }
-            }
-        }
-    });
+function setRango(r) {
+  rango = r;
+  $('#agrupar button').removeClass('active').filter(`[data-r="${r}"]`).addClass('active');
 }
 
-$('#btn-filtrar').on('click', function(){
-    fetchVentasData();
+$('#presets').on('click', 'button', function () {
+  $('#presets button').removeClass('active');
+  $(this).addClass('active');
+  aplicarPreset(String($(this).data('p')));
+  fetchVentasData();
+});
+$('#agrupar').on('click', 'button', function () { setRango($(this).data('r')); fetchVentasData(); });
+$('#fecha-inicio, #fecha-fin').on('change', function () {
+  $('#presets button').removeClass('active');
+  if ($('#fecha-inicio').val() && $('#fecha-fin').val()) fetchVentasData();
 });
 
-$(document).ready(function(){
-    fetchVentasData();
-    fetchStockBajo();
-    fetchProductosTendencia();
+$(function () {
+  aplicarPreset('30');
+  fetchVentasData();
+  fetchStockBajo();
+  fetchTendencia();
 });
 </script>
 {% endblock %}

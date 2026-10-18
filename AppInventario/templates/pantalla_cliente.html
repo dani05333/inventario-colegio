@@ -1,0 +1,234 @@
+{% load static %}<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pantalla cliente · Chloe Creaciones</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%236250d6'/%3E%3Ctext x='32' y='42' font-family='Arial' font-weight='700' font-size='26' fill='white' text-anchor='middle'%3ECC%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="{% static 'AppInventario/app.css' %}" rel="stylesheet">
+  <style>
+    /* Todo escala con el tamaño de la pantalla (sirve para 9,7" y 11,6") */
+    html, body { height: 100%; overflow: hidden; }
+    body { background: var(--bg); font-size: clamp(14px, 1.9vmin, 22px); user-select: none; }
+    body.idle-cursor { cursor: none; }
+
+    .cd { height: 100vh; display: flex; flex-direction: column; }
+    .cd-head {
+      display: flex; align-items: center; gap: 2.2vmin; padding: 2.4vmin 3.4vmin;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+    }
+    .cd-head .brand-logo { width: 6vmin; height: 6vmin; border-radius: 1.6vmin; font-size: 2.4vmin; }
+    .cd-head .name { font-weight: 700; font-size: 2.7vmin; line-height: 1.1; }
+    .cd-head .sub { color: var(--muted); font-size: 1.9vmin; }
+    .cd-head .clock { margin-left: auto; text-align: right; color: var(--text-2); font-size: 1.9vmin; line-height: 1.2; }
+    .cd-head .clock strong { display: block; color: var(--text); font-size: 3vmin; }
+
+    .cd-body { flex: 1; min-height: 0; position: relative; }
+    .vista { position: absolute; inset: 0; display: none; }
+    .vista.on { display: flex; animation: aparecer .25s ease-out; }
+    @keyframes aparecer { from { opacity: 0; } to { opacity: 1; } }
+
+    /* Bienvenida (sin venta, u oculta por el vendedor) */
+    .v-bienvenida { flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 2vmin; padding: 4vmin; }
+    .v-bienvenida .big-logo {
+      width: 20vmin; height: 20vmin; border-radius: 5vmin; display: grid; place-items: center;
+      background: linear-gradient(135deg, var(--primary), #8b7cf0); color: #fff; font-weight: 800; font-size: 8vmin;
+      box-shadow: 0 2vmin 5vmin rgba(98, 80, 214, .3);
+    }
+    .v-bienvenida h1 { font-size: 6vmin; font-weight: 800; margin: 2vmin 0 0; letter-spacing: -.02em; }
+    .v-bienvenida p { font-size: 2.8vmin; color: var(--text-2); margin: 0; }
+
+    /* Venta en curso */
+    .v-venta { gap: 2.6vmin; padding: 2.6vmin 3.4vmin; }
+    .lista {
+      flex: 1; min-width: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 2vmin;
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .lista-head { padding: 2vmin 2.6vmin; border-bottom: 1px solid var(--border); font-weight: 650; font-size: 2.4vmin; display: flex; justify-content: space-between; }
+    .lista-head span { color: var(--muted); font-weight: 500; }
+    .items { flex: 1; overflow: hidden; }
+    .item { display: grid; grid-template-columns: 1fr auto; gap: .4vmin 2vmin; padding: 1.8vmin 2.6vmin; border-bottom: 1px solid var(--border); }
+    .item.nuevo { animation: nuevo 1.6s ease-out; }
+    @keyframes nuevo { from { background: var(--primary-50); } to { background: transparent; } }
+    .item .nombre { font-weight: 650; font-size: 2.7vmin; line-height: 1.2; }
+    .item .talla { display: inline-block; font-size: 2vmin; font-weight: 700; background: var(--primary-50); color: var(--primary); border-radius: 1vmin; padding: .2vmin 1.1vmin; margin-left: .8vmin; vertical-align: middle; }
+    .item .det { color: var(--muted); font-size: 2.1vmin; }
+    .item .sub { font-weight: 700; font-size: 2.7vmin; text-align: right; font-variant-numeric: tabular-nums; align-self: center; grid-row: span 2; }
+    .mas { padding: 1.4vmin 2.6vmin; color: var(--muted); font-size: 2vmin; text-align: center; }
+
+    .total-panel {
+      width: 38%; min-width: 260px; display: flex; flex-direction: column; justify-content: center; gap: 2vmin;
+      background: var(--text); color: #fff; border-radius: 2vmin; padding: 4vmin 3.6vmin;
+    }
+    .total-panel .tp-lbl { font-size: 2.4vmin; opacity: .7; }
+    .total-panel .total { font-size: 9vmin; font-weight: 800; letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; word-break: break-all; }
+    .total-panel .unidades { font-size: 2.3vmin; opacity: .7; }
+    .pago { margin-top: 2vmin; padding-top: 2.4vmin; border-top: 1px solid rgba(255, 255, 255, .15); display: none; }
+    .pago.on { display: block; }
+    .pago .fila { display: flex; justify-content: space-between; font-size: 2.6vmin; margin-bottom: 1vmin; font-variant-numeric: tabular-nums; }
+    .pago .vuelto { font-size: 4.4vmin; font-weight: 800; color: #4ade80; }
+
+    /* Gracias */
+    .v-gracias { flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 1.6vmin; }
+    .v-gracias .check { width: 18vmin; height: 18vmin; border-radius: 50%; display: grid; place-items: center; background: var(--success-50); color: var(--success); font-size: 10vmin; }
+    .v-gracias h1 { font-size: 6vmin; font-weight: 800; margin: 2vmin 0 0; }
+    .v-gracias .monto { font-size: 3vmin; color: var(--text-2); }
+    .v-gracias .vuelto { font-size: 4.2vmin; font-weight: 800; color: var(--success); }
+
+    /* Pantallas verticales o muy angostas: el total va abajo */
+    @media (max-aspect-ratio: 1/1) {
+      .v-venta { flex-direction: column; }
+      .total-panel { width: auto; min-width: 0; padding: 3vmin; }
+      .total-panel .total { font-size: 8vmin; }
+    }
+
+    .fs-hint {
+      position: fixed; right: 2vmin; bottom: 2vmin; z-index: 10;
+      border: 0; border-radius: 999px; padding: 1.2vmin 2.2vmin; font-size: 1.8vmin; font-weight: 600;
+      background: rgba(21, 24, 33, .78); color: #fff; display: flex; align-items: center; gap: 1vmin;
+      transition: opacity .3s;
+    }
+    .fs-hint.hide { opacity: 0; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div class="cd">
+    <header class="cd-head">
+      <span class="brand-logo">CC</span>
+      <div>
+        <div class="name">Chloe Creaciones</div>
+        <div class="sub">Uniformes escolares</div>
+      </div>
+      <div class="clock" id="clock"></div>
+    </header>
+
+    <div class="cd-body">
+      <section class="vista v-bienvenida on" id="v-bienvenida">
+        <div class="big-logo">CC</div>
+        <h1>¡Bienvenido/a!</h1>
+        <p>Chloe Creaciones · Uniformes escolares</p>
+      </section>
+
+      <section class="vista v-venta" id="v-venta">
+        <div class="lista">
+          <div class="lista-head">Tu compra <span id="n-productos"></span></div>
+          <div class="items" id="items"></div>
+        </div>
+        <div class="total-panel">
+          <div class="tp-lbl">Total a pagar</div>
+          <div class="total" id="total">$0</div>
+          <div class="unidades" id="unidades"></div>
+          <div class="pago" id="pago">
+            <div class="fila"><span>Forma de pago</span><span id="metodo"></span></div>
+            <div id="pago-efectivo">
+              <div class="fila"><span>Efectivo recibido</span><span id="recibido"></span></div>
+              <div class="fila"><span>Vuelto</span><span class="vuelto" id="vuelto"></span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="vista v-gracias" id="v-gracias">
+        <div class="check"><i class="bi bi-check-lg"></i></div>
+        <h1>¡Gracias por su compra!</h1>
+        <div class="monto" id="g-total"></div>
+        <div class="vuelto" id="g-vuelto"></div>
+      </section>
+    </div>
+  </div>
+
+  <button class="fs-hint" id="fs-hint"><i class="bi bi-arrows-fullscreen"></i>Pantalla completa</button>
+  <div id="print-area"></div>
+
+  <script src="{% static 'AppInventario/app.js' %}"></script>
+  <script>
+  const canal = 'BroadcastChannel' in window ? new BroadcastChannel('pos-pantalla-cliente') : null;
+  let timerGracias = null;
+
+  function mostrar(id) {
+    document.querySelectorAll('.vista').forEach(v => v.classList.toggle('on', v.id === id));
+  }
+
+  function render(e) {
+    clearTimeout(timerGracias);
+    // Oculta por el vendedor, o sin productos: pantalla de bienvenida (no se ve ningún dato de la venta)
+    if (!e.visible) { mostrar('v-bienvenida'); return; }
+
+    if (e.fase === 'gracias' && e.gracias) {
+      document.getElementById('g-total').textContent = `Total pagado: ${App.money(e.gracias.total)}${e.gracias.metodo ? ' · ' + e.gracias.metodo : ''}`;
+      document.getElementById('g-vuelto').textContent = e.gracias.recibido ? `Su vuelto: ${App.money(e.gracias.vuelto)}` : '';
+      mostrar('v-gracias');
+      timerGracias = setTimeout(() => mostrar('v-bienvenida'), 10000);
+      return;
+    }
+    if (!e.items.length) { mostrar('v-bienvenida'); return; }
+
+    mostrar('v-venta');
+
+    // Lo último agregado va arriba; si no caben todos, se quitan los más antiguos y se resume cuántos faltan
+    const cont = document.getElementById('items');
+    cont.innerHTML = e.items.map(i => `
+      <div class="item ${i.id === e.ultimoId ? 'nuevo' : ''}">
+        <div class="nombre">${App.esc(i.nombre)}<span class="talla">T. ${App.esc(i.talla)}</span></div>
+        <div class="sub">${App.money(i.subtotal)}</div>
+        <div class="det">${i.cantidad} × ${App.money(i.precio)} · ${App.esc(i.colegio)}</div>
+      </div>`).join('');
+    let ocultos = 0;
+    const mas = document.createElement('div');
+    mas.className = 'mas';
+    while (cont.scrollHeight > cont.clientHeight && cont.querySelectorAll('.item').length > 1) {
+      cont.querySelectorAll('.item')[cont.querySelectorAll('.item').length - 1].remove();
+      ocultos++;
+      mas.textContent = `y ${ocultos} producto${ocultos === 1 ? '' : 's'} más…`;
+      if (!mas.isConnected) cont.appendChild(mas);
+    }
+    document.getElementById('n-productos').textContent = `${e.items.length} producto${e.items.length === 1 ? '' : 's'}`;
+    document.getElementById('total').textContent = App.money(e.total);
+    document.getElementById('unidades').textContent = `${e.unidades} unidad${e.unidades === 1 ? '' : 'es'}`;
+
+    // Al cobrar: forma de pago, y si es efectivo con monto ingresado, también el vuelto
+    const enCobro = e.fase === 'cobro' && !!e.metodo;
+    const conVuelto = enCobro && e.efectivo && e.recibido !== null && e.recibido >= e.total;
+    document.getElementById('pago').classList.toggle('on', enCobro);
+    document.getElementById('pago-efectivo').style.display = conVuelto ? '' : 'none';
+    if (enCobro) document.getElementById('metodo').textContent = e.metodo;
+    if (conVuelto) {
+      document.getElementById('recibido').textContent = App.money(e.recibido);
+      document.getElementById('vuelto').textContent = App.money(e.recibido - e.total);
+    }
+  }
+
+  if (canal) {
+    canal.onmessage = ev => { if (ev.data && ev.data.tipo === 'estado') render(ev.data); };
+    canal.postMessage({ tipo: 'hola' });                              // pide el estado actual al punto de venta
+    setInterval(() => canal.postMessage({ tipo: 'ping' }), 3000);     // avisa que esta pantalla está abierta
+  }
+
+  // Reloj
+  const clock = document.getElementById('clock');
+  function tick() {
+    const d = new Date();
+    clock.innerHTML = `<strong>${d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}</strong>${d.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}`;
+  }
+  tick(); setInterval(tick, 15000);
+
+  // Pantalla completa: el botón aparece solo si no lo está; el cursor se esconde si no se usa
+  const hint = document.getElementById('fs-hint');
+  hint.addEventListener('click', () => document.documentElement.requestFullscreen().catch(() => {}));
+  function actualizarHint() { hint.classList.toggle('hide', !!document.fullscreenElement || window.innerHeight === screen.height); }
+  document.addEventListener('fullscreenchange', actualizarHint);
+  window.addEventListener('resize', actualizarHint);
+  actualizarHint();
+  let cursorTimer;
+  document.addEventListener('mousemove', () => {
+    document.body.classList.remove('idle-cursor');
+    clearTimeout(cursorTimer);
+    cursorTimer = setTimeout(() => document.body.classList.add('idle-cursor'), 3000);
+  });
+  </script>
+</body>
+</html>

@@ -1,0 +1,98 @@
+{% load static %}<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Inicio{% endblock %} · Chloe Creaciones</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%236250d6'/%3E%3Ctext x='32' y='42' font-family='Arial' font-weight='700' font-size='26' fill='white' text-anchor='middle'%3ECC%3C/text%3E%3C/svg%3E">
+  <script>
+    // Menú lateral compacto (solo íconos): lo que eligió el usuario, o automático en pantallas angostas.
+    // Va aquí arriba para que la página no "salte" al cargar.
+    (function () {
+      var pref = null;
+      try { pref = localStorage.getItem('sidebar_rail'); } catch (e) {}
+      var rail = pref === null ? window.innerWidth < 1280 : pref === '1';
+      if (rail) document.documentElement.classList.add('rail');
+    })();
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+  <link href="{% static 'AppInventario/app.css' %}" rel="stylesheet">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+{% with n=request.resolver_match.url_name %}
+  <aside class="app-sidebar">
+    <a href="{% url 'dashboard_ventas' %}" class="brand" title="Chloe Creaciones">
+      <span class="brand-logo">CC</span>
+      <span class="brand-text">
+        <span class="brand-name d-block">Chloe Creaciones</span>
+        <span class="brand-sub">Uniformes escolares</span>
+      </span>
+    </a>
+
+    <nav class="sidebar-scroll">
+      <div class="nav-section"><span>Ventas</span></div>
+      <ul class="side-nav">
+        <li><a href="{% url 'punto_de_venta' %}" title="Punto de venta" class="{% if n == 'punto_de_venta' %}active{% endif %}"><i class="bi bi-upc-scan"></i><span>Punto de venta</span></a></li>
+        <li><a href="{% url 'historial_ventas' %}" title="Historial de ventas" class="{% if n == 'historial_ventas' or n == 'boleta' %}active{% endif %}"><i class="bi bi-receipt"></i><span>Historial de ventas</span></a></li>
+        <li><a href="{% url 'dashboard_ventas' %}" title="Análisis" class="{% if n == 'dashboard_ventas' %}active{% endif %}"><i class="bi bi-graph-up-arrow"></i><span>Análisis</span></a></li>
+      </ul>
+
+      <div class="nav-section"><span>Stock</span></div>
+      <ul class="side-nav">
+        <li><a href="{% url 'ver_inventario' %}" title="Inventario" class="{% if n in 'ver_inventario crear_inventario editar_inventario eliminar_inventario' %}active{% endif %}"><i class="bi bi-box-seam"></i><span>Inventario</span></a></li>
+        <li><a href="{% url 'etiquetas' %}" title="Etiquetas" class="{% if n == 'etiquetas' %}active{% endif %}"><i class="bi bi-upc"></i><span>Etiquetas</span></a></li>
+      </ul>
+
+      <div class="nav-section"><span>Catálogos</span></div>
+      <ul class="side-nav">
+        <li><a href="{% url 'ver_colegios' %}" title="Colegios" class="{% if n in 'ver_colegios crear_colegio editar_colegio eliminar_colegio' %}active{% endif %}"><i class="bi bi-building"></i><span>Colegios</span></a></li>
+        <li><a href="{% url 'ver_uniformes' %}" title="Uniformes" class="{% if n in 'ver_uniformes crear_uniforme editar_uniforme eliminar_uniforme' %}active{% endif %}"><i class="bi bi-person-badge"></i><span>Uniformes</span></a></li>
+        <li><a href="{% url 'ver_tallas' %}" title="Tallas" class="{% if n in 'ver_tallas crear_talla editar_tallas eliminar_tallas' %}active{% endif %}"><i class="bi bi-rulers"></i><span>Tallas</span></a></li>
+      </ul>
+    </nav>
+
+    <div class="sidebar-cta">
+      <a href="{% url 'punto_de_venta' %}" class="btn btn-primary" title="Nueva venta"><i class="bi bi-plus-lg"></i><span class="ms-1">Nueva venta</span></a>
+      <button type="button" class="rail-toggle" id="rail-toggle" title="Contraer / expandir menú">
+        <i class="bi bi-chevron-double-left"></i><span>Contraer menú</span>
+      </button>
+    </div>
+  </aside>
+{% endwith %}
+  <div class="sidebar-backdrop" data-toggle-sidebar></div>
+
+  <div class="app-main">
+    <header class="app-topbar">
+      <button class="btn-icon sidebar-toggle" data-toggle-sidebar aria-label="Abrir menú"><i class="bi bi-list"></i></button>
+      <div class="topbar-titles">
+        <h1 class="page-title">{% block page_title %}Inicio{% endblock %}</h1>
+        <p class="page-subtitle">{% block page_subtitle %}{% endblock %}</p>
+      </div>
+      <div class="topbar-right">
+        {% block topbar_actions %}{% endblock %}
+        <div class="topbar-clock" id="topbar-clock"></div>
+      </div>
+    </header>
+
+    <main class="app-content {% block content_class %}{% endblock %}">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  <div id="print-area"></div>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+  <script src="{% static 'AppInventario/app.js' %}"></script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

@@ -1,22 +1,9 @@
-{% extends 'inicio.html' %}
+{% extends 'base.html' %}
+{% block title %}{% if form.instance.pk %}Editar{% else %}Nueva{% endif %} talla{% endblock %}
+{% block page_title %}Tallas{% endblock %}
+{% block page_subtitle %}{% if form.instance.pk %}Editando «{{ form.instance }}»{% else %}Agregar una talla{% endif %}{% endblock %}
+
 {% block content %}
-
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Agregar Tallas</title>
-</head>
-<body>
-    <h1>Agregar Tallas</h1>
-    
-    <form method="post">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit">{% if form.instance.pk %}Actualizar{% else %}Guardar{% endif %}</button>
-    </form>
-
-    <p><a href="{% url 'ver_tallas' %}">Volver a la lista de tallas</a></p>
-</body>
-</html>
+{% url 'ver_tallas' as volver_url %}
+{% include 'partials/form_simple.html' with singular='Talla' plural='Tallas' nuevo_txt='Nueva talla' %}
 {% endblock %}

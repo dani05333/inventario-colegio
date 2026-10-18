@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% block title %}Boleta N° {{ venta.id }}{% endblock %}
+{% block page_title %}Boleta N° {{ venta.id }}{% endblock %}
+{% block page_subtitle %}{{ venta.fecha|date:"l j \d\e F \d\e Y, H:i" }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .boleta-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 24px; align-items: start; max-width: 860px; margin: 0 auto; }
+  @media (max-width: 767.98px) { .boleta-wrap { grid-template-columns: 1fr; } }
+  .paper {
+    background: #fff; border: 1px solid var(--border); border-radius: 6px;
+    box-shadow: var(--shadow); padding: 28px 20px 32px; position: relative;
+  }
+  .paper::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: -8px; height: 8px;
+    background: radial-gradient(circle at 6px 0, transparent 6px, #fff 6.5px) repeat-x;
+    background-size: 12px 8px;
+  }
+  .paper .receipt { font-size: 13px; width: 300px; max-width: 100%; }
+  .acciones .btn { width: 100%; justify-content: center; display: flex; align-items: center; gap: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <a href="{% url 'historial_ventas' %}" class="d-inline-flex align-items-center gap-1 text-secondary"><i class="bi bi-arrow-left"></i> Volver al historial</a>
+</div>
+
+<div class="boleta-wrap">
+  <div class="paper">
+    <div id="boleta"></div>
+  </div>
+
+  <div class="d-flex flex-column gap-3">
+    <div class="panel acciones">
+      <div class="panel-body d-flex flex-column gap-2">
+        <button class="btn btn-primary btn-lg" id="btn-imprimir"><i class="bi bi-printer"></i>Imprimir</button>
+        <button class="btn btn-light-border" id="btn-pdf"><i class="bi bi-file-earmark-arrow-down"></i>Descargar PDF</button>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-body">
+        <div class="d-flex justify-content-between mb-1"><span class="text-secondary">Forma de pago</span><strong>{{ venta.get_metodo_pago_display }}</strong></div>
+        <div class="d-flex justify-content-between mb-1"><span class="text-secondary">Productos</span><strong class="tabular">{{ venta_data.items|length }}</strong></div>
+        <div class="d-flex justify-content-between mb-1"><span class="text-secondary">Unidades</span><strong class="tabular">{{ venta_data.unidades }}</strong></div>
+        <div class="d-flex justify-content-between"><span class="text-secondary">Total</span><strong class="tabular" id="res-total"></strong></div>
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      {% if anterior %}<a href="{% url 'boleta' anterior %}" class="btn btn-light-border flex-fill"><i class="bi bi-chevron-left"></i> N° {{ anterior }}</a>{% endif %}
+      {% if siguiente %}<a href="{% url 'boleta' siguiente %}" class="btn btn-light-border flex-fill">N° {{ siguiente }} <i class="bi bi-chevron-right"></i></a>{% endif %}
+    </div>
+  </div>
+</div>
+{{ venta_data|json_script:"venta-data" }}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const venta = JSON.parse(document.getElementById('venta-data').textContent);
+document.getElementById('boleta').innerHTML = App.receiptHtml(venta);
+document.getElementById('res-total').textContent = App.money(venta.total);
+
+$('#btn-imprimir').on('click', () => App.printReceipt(venta));
+$('#btn-pdf').on('click', async function () {
+  const btn = $(this);
+  btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span>Generando…');
+  await App.downloadReceipt(venta);
+  btn.prop('disabled', false).html('<i class="bi bi-file-earmark-arrow-down"></i>Descargar PDF');
+});
+
+// Abrir con ?imprimir=1 lanza la impresión directamente
+if (new URLSearchParams(location.search).get('imprimir')) setTimeout(() => App.printReceipt(venta), 300);
+</script>
+{% endblock %}

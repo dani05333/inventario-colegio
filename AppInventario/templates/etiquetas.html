@@ -1,0 +1,354 @@
+{% extends 'base.html' %}
+{% block title %}Etiquetas{% endblock %}
+{% block page_title %}Etiquetas con código de barras{% endblock %}
+{% block page_subtitle %}Elige los productos, cuántas etiquetas de cada uno y el formato de impresión{% endblock %}
+
+{% block extra_head %}
+<style>
+  .lab-layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: start; }
+  @media (max-width: 1199.98px) { .lab-layout { grid-template-columns: 1fr; } }
+  .lab-side { position: sticky; top: calc(var(--topbar-h) + 20px); }
+  @media (max-width: 1199.98px) { .lab-side { position: static; } }
+
+  .qty { width: 76px; text-align: center; padding: .35rem .4rem; }
+  tr.is-off td { opacity: .5; }
+  tr.is-sel td { background: #fbfaff; }
+
+  .preview-box {
+    background: repeating-linear-gradient(45deg, var(--surface-2), var(--surface-2) 8px, #f1f2f7 8px, #f1f2f7 16px);
+    border-radius: 12px; padding: 22px; display: grid; place-items: center; min-height: 170px;
+  }
+  .preview-box .lbl { box-shadow: 0 2px 10px rgba(20, 24, 40, .15); border-radius: 1.5mm; }
+  .resumen { display: flex; justify-content: space-between; font-size: 13.5px; color: var(--text-2); margin-bottom: 4px; }
+  .resumen strong { color: var(--text); }
+  .switch-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; }
+  .form-check-input:checked { background-color: var(--primary); border-color: var(--primary); }
+  .banner {
+    display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+    background: var(--warning-50); color: var(--warning); border-radius: 12px; padding: 12px 16px; margin-bottom: 16px;
+  }
+  .banner .grow { flex: 1; min-width: 200px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="banner d-none" id="banner-sin-codigo">
+  <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+  <div class="grow"><strong id="n-sin-codigo">0</strong> producto(s) no tienen código de barras, así que no se pueden etiquetar.</div>
+  <button class="btn btn-sm btn-light-border" id="btn-asignar"><i class="bi bi-magic me-1"></i>Generarles código automáticamente</button>
+</div>
+
+<div class="lab-layout">
+  <!-- Productos -->
+  <div class="panel">
+    <div class="panel-header flex-wrap">
+      <div class="search-box flex-grow-1" style="max-width:320px">
+        <i class="bi bi-search"></i>
+        <input type="search" id="q" class="form-control" placeholder="Buscar producto o código…">
+      </div>
+      <div class="d-flex gap-2 flex-wrap align-items-center">
+        <select class="form-select" id="f-colegio" style="width:auto"><option value="">Todos los colegios</option></select>
+        <div class="dropdown">
+          <button class="btn btn-light-border dropdown-toggle" data-bs-toggle="dropdown">Cantidad</button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><h6 class="dropdown-header">Para los seleccionados</h6></li>
+            <li><button class="dropdown-item" data-qty="1">1 etiqueta por producto</button></li>
+            <li><button class="dropdown-item" data-qty="stock">Una por unidad en stock</button></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="table-responsive" style="max-height:calc(100vh - 260px);overflow:auto">
+      <table class="table-app">
+        <thead style="position:sticky;top:0;z-index:1">
+          <tr>
+            <th style="width:44px"><input type="checkbox" class="form-check-input" id="sel-todos" title="Seleccionar visibles"></th>
+            <th>Producto</th>
+            <th>Código</th>
+            <th class="num">Stock</th>
+            <th class="text-center">Etiquetas</th>
+          </tr>
+        </thead>
+        <tbody id="lista"></tbody>
+      </table>
+      <div class="empty d-none" id="lista-vacia"><i class="bi bi-box-seam"></i><strong>Sin productos</strong>No hay productos que coincidan.</div>
+    </div>
+  </div>
+
+  <!-- Configuración -->
+  <div class="lab-side d-flex flex-column gap-3">
+    <div class="panel">
+      <div class="panel-header"><h2 class="panel-title">Formato</h2></div>
+      <div class="panel-body">
+        <label class="form-label" for="formato">Tipo de etiqueta</label>
+        <select class="form-select" id="formato"></select>
+        <div class="field-help" id="formato-ayuda"></div>
+
+        <div id="opt-inicio" class="mt-3 d-none">
+          <label class="form-label" for="inicio">Empezar en la etiqueta N°</label>
+          <input type="number" min="1" value="1" id="inicio" class="form-control" style="width:110px">
+          <div class="field-help">Para aprovechar una hoja que ya está usada a medias.</div>
+        </div>
+
+        <div class="mt-3">
+          <div class="switch-row"><label class="m-0" for="o-colegio">Mostrar colegio</label><input class="form-check-input m-0" type="checkbox" role="switch" id="o-colegio" checked></div>
+          <div class="switch-row"><label class="m-0" for="o-precio">Mostrar precio</label><input class="form-check-input m-0" type="checkbox" role="switch" id="o-precio" checked></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header"><h2 class="panel-title">Vista previa</h2><span class="cell-sub">tamaño real</span></div>
+      <div class="panel-body">
+        <div class="preview-box" id="preview"></div>
+        <div class="mt-3">
+          <div class="resumen"><span>Productos seleccionados</span><strong id="r-productos">0</strong></div>
+          <div class="resumen"><span>Etiquetas a imprimir</span><strong id="r-etiquetas">0</strong></div>
+          <div class="resumen d-none" id="r-hojas-row"><span>Hojas</span><strong id="r-hojas">0</strong></div>
+        </div>
+        <button class="btn btn-primary btn-lg w-100 mt-3" id="btn-imprimir" disabled><i class="bi bi-printer me-2"></i>Imprimir etiquetas</button>
+        <div class="field-help mt-2">
+          <i class="bi bi-info-circle"></i> En la ventana de impresión usa <strong>márgenes: ninguno</strong> y <strong>escala 100 %</strong>.
+          Para rollo térmico, elige la impresora de etiquetas y el mismo tamaño de papel.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
+<script>
+/* Medidas en milímetros */
+const FORMATOS = {
+  'rollo-50x25': { nombre: 'Rollo térmico 50 × 25 mm', w: 50, h: 25, ayuda: 'Una etiqueta por página. El tamaño más común en impresoras térmicas.' },
+  'rollo-40x30': { nombre: 'Rollo térmico 40 × 30 mm', w: 40, h: 30, ayuda: 'Una etiqueta por página.' },
+  'rollo-60x40': { nombre: 'Rollo térmico 60 × 40 mm', w: 60, h: 40, ayuda: 'Una etiqueta por página. Más espacio para el texto.' },
+  'carta-3x10':  { nombre: 'Hoja carta · 30 por hoja (66,7 × 25,4 mm)', w: 66.675, h: 25.4, hoja: { w: 215.9, h: 279.4, cols: 3, rows: 10, mt: 12.7, ml: 4.76, gx: 3.175, gy: 0 }, ayuda: 'Hoja adhesiva tipo Avery 5160 para impresora común.' },
+  'a4-3x8':      { nombre: 'Hoja A4 · 24 por hoja (70 × 37 mm)', w: 70, h: 37, hoja: { w: 210, h: 297, cols: 3, rows: 8, mt: 0.5, ml: 0, gx: 0, gy: 0 }, ayuda: 'Hoja adhesiva A4 de 24 etiquetas sin márgenes.' },
+  'a4-4x10':     { nombre: 'Hoja A4 · 40 por hoja (48,5 × 25,4 mm)', w: 48.5, h: 25.4, hoja: { w: 210, h: 297, cols: 4, rows: 10, mt: 21.5, ml: 8, gx: 0, gy: 0 }, ayuda: 'Hoja adhesiva A4 de 40 etiquetas pequeñas.' },
+};
+
+let productos = [];
+const seleccion = new Map();   // id -> cantidad de etiquetas
+const STORE = 'etiquetas_formato_v1';
+
+function guardarPrefs() {
+  try { localStorage.setItem(STORE, JSON.stringify({ f: $('#formato').val(), c: $('#o-colegio').prop('checked'), p: $('#o-precio').prop('checked') })); } catch (e) {}
+}
+function cargarPrefs() {
+  try {
+    const p = JSON.parse(localStorage.getItem(STORE));
+    if (p) { if (FORMATOS[p.f]) $('#formato').val(p.f); $('#o-colegio').prop('checked', p.c); $('#o-precio').prop('checked', p.p); }
+  } catch (e) {}
+}
+
+/* ---------- Datos ---------- */
+function cargar() {
+  return $.getJSON("{% url 'inventario_json' %}").then(res => {
+    productos = res.data.map(p => ({
+      id: p.id, codigo: String(p.codigo_barras ?? ''), nombre: p.uniforme, talla: p.talla,
+      colegio: p.colegio, precio: p.precio_unitario, stock: p.cantidad,
+      _q: `${p.uniforme} ${p.talla} ${p.colegio} ${p.codigo_barras}`.toLowerCase()
+    })).sort((a, b) => (a.colegio + a.nombre + a.talla).localeCompare(b.colegio + b.nombre + b.talla, 'es', { numeric: true }));
+
+    const sel = $('#f-colegio');
+    const actual = sel.val();
+    sel.find('option:not(:first)').remove();
+    [...new Set(productos.map(p => p.colegio))].sort().forEach(c => sel.append($('<option>').val(c).text(c)));
+    sel.val(actual);
+
+    const sinCodigo = productos.filter(p => !App.codigoValido(p.codigo)).length;
+    $('#banner-sin-codigo').toggleClass('d-none', sinCodigo === 0);
+    $('#n-sin-codigo').text(sinCodigo);
+    renderLista();
+    actualizar();
+  });
+}
+
+function visibles() {
+  const terms = $('#q').val().toLowerCase().trim().split(/\s+/).filter(Boolean);
+  const col = $('#f-colegio').val();
+  return productos.filter(p => (!col || p.colegio === col) && terms.every(t => p._q.includes(t)));
+}
+
+function renderLista() {
+  const lista = visibles();
+  $('#lista').html(lista.map(p => {
+    const ok = App.codigoValido(p.codigo);
+    const sel = seleccion.has(p.id);
+    return `<tr data-id="${p.id}" class="${ok ? '' : 'is-off'} ${sel ? 'is-sel' : ''}">
+      <td><input type="checkbox" class="form-check-input js-sel" ${sel ? 'checked' : ''} ${ok ? '' : 'disabled'}></td>
+      <td><div class="cell-strong">${App.esc(p.nombre)} <span class="badge-soft badge-muted ms-1">${App.esc(p.talla)}</span></div><div class="cell-sub">${App.esc(p.colegio)}</div></td>
+      <td>${ok ? `<span class="code-pill">${App.esc(p.codigo)}</span>` : '<span class="badge-soft badge-warn">Sin código</span>'}</td>
+      <td class="num">${p.stock}</td>
+      <td class="text-center"><input type="number" min="1" max="999" class="form-control qty js-qty mx-auto" value="${seleccion.get(p.id) || 1}" ${ok ? '' : 'disabled'}></td>
+    </tr>`;
+  }).join(''));
+  $('#lista-vacia').toggleClass('d-none', lista.length > 0);
+  const elegibles = lista.filter(p => App.codigoValido(p.codigo));
+  $('#sel-todos').prop('checked', elegibles.length > 0 && elegibles.every(p => seleccion.has(p.id)));
+}
+
+/* ---------- Etiqueta ---------- */
+function etiquetaHtml(p, f) {
+  const verColegio = $('#o-colegio').prop('checked');
+  const verPrecio = $('#o-precio').prop('checked');
+  const fs = Math.max(2.3, Math.min(f.h * 0.105, 3.6));   // tamaño de letra en mm según el alto
+  const pad = Math.max(1.2, f.h * 0.055);
+  const sub = (verColegio || verPrecio) ? `
+    <div class="lbl-sub" style="font-size:${fs * 0.82}mm;margin-top:${fs * 0.15}mm">
+      <span class="lbl-school">${verColegio ? App.esc(p.colegio) : ''}</span>
+      ${verPrecio ? `<span class="lbl-price">${App.money(p.precio)}</span>` : ''}
+    </div>` : '';
+  return `<div class="lbl" style="width:${f.w}mm;height:${f.h}mm;padding:${pad}mm ${pad * 1.3}mm">
+      <div class="lbl-top" style="font-size:${fs}mm">
+        <span class="lbl-name">${App.esc(p.nombre)}</span>
+        <span class="lbl-talla">T. ${App.esc(p.talla)}</span>
+      </div>
+      ${sub}
+      <div class="lbl-code" style="margin-top:${fs * 0.3}mm"><svg data-code="${App.esc(p.codigo)}"></svg></div>
+    </div>`;
+}
+
+function dibujarCodigos(root) {
+  root.querySelectorAll('svg[data-code]').forEach(svg => {
+    try { App.renderBarcode(svg, svg.dataset.code, { height: 46, width: 2, fontSize: 17, textMargin: 1, marginBottom: 2 }); }
+    catch (e) { svg.outerHTML = '<span style="font-size:2.5mm">Código inválido</span>'; }
+  });
+}
+
+function totalEtiquetas() {
+  let n = 0;
+  seleccion.forEach(q => n += q);
+  return n;
+}
+
+function actualizar() {
+  const f = FORMATOS[$('#formato').val()];
+  $('#formato-ayuda').text(f.ayuda);
+  $('#opt-inicio').toggleClass('d-none', !f.hoja);
+
+  const ejemplo = productos.find(p => seleccion.has(p.id)) || productos.find(p => App.codigoValido(p.codigo))
+    || { nombre: 'Polera piqué', talla: '12', colegio: 'Colegio de ejemplo', precio: 8990, codigo: '2000000000015' };
+  const prev = document.getElementById('preview');
+  prev.innerHTML = etiquetaHtml(ejemplo, f);
+  dibujarCodigos(prev);
+
+  const n = totalEtiquetas();
+  $('#r-productos').text(seleccion.size);
+  $('#r-etiquetas').text(App.num(n));
+  $('#r-hojas-row').toggleClass('d-none', !f.hoja);
+  if (f.hoja) {
+    const porHoja = f.hoja.cols * f.hoja.rows;
+    const offset = Math.max(0, (parseInt($('#inicio').val()) || 1) - 1) % porHoja;
+    $('#r-hojas').text(n ? Math.ceil((n + offset) / porHoja) : 0);
+  }
+  $('#btn-imprimir').prop('disabled', n === 0);
+  guardarPrefs();
+}
+
+/* ---------- Impresión ---------- */
+function imprimir() {
+  const f = FORMATOS[$('#formato').val()];
+  const items = [];
+  productos.forEach(p => { const q = seleccion.get(p.id); for (let i = 0; i < (q || 0); i++) items.push(p); });
+  if (!items.length) return;
+
+  let html, pageCss;
+  if (!f.hoja) {
+    html = items.map(p => `<div style="width:${f.w}mm;height:${f.h}mm;break-after:page;overflow:hidden">${etiquetaHtml(p, f)}</div>`).join('');
+    pageCss = `@page { size: ${f.w}mm ${f.h}mm; margin: 0; }`;
+  } else {
+    const h = f.hoja;
+    const porHoja = h.cols * h.rows;
+    const offset = Math.max(0, (parseInt($('#inicio').val()) || 1) - 1) % porHoja;
+    const celdas = Array(offset).fill(null).concat(items);
+    const hojas = [];
+    for (let i = 0; i < celdas.length; i += porHoja) hojas.push(celdas.slice(i, i + porHoja));
+    html = hojas.map(hoja => `
+      <div style="width:${h.w}mm;height:${h.h}mm;padding:${h.mt}mm 0 0 ${h.ml}mm;box-sizing:border-box;break-after:page;overflow:hidden;
+                  display:grid;grid-template-columns:repeat(${h.cols}, ${f.w}mm);grid-auto-rows:${f.h}mm;column-gap:${h.gx}mm;row-gap:${h.gy}mm">
+        ${hoja.map(p => p ? etiquetaHtml(p, f) : `<div class="lbl-blank"></div>`).join('')}
+      </div>`).join('');
+    pageCss = `@page { size: ${h.w}mm ${h.h}mm; margin: 0; }`;
+  }
+
+  const area = document.getElementById('print-area');
+  area.innerHTML = html;
+  dibujarCodigos(area);
+  let st = document.getElementById('label-page-css');
+  if (!st) { st = document.createElement('style'); st.id = 'label-page-css'; document.head.appendChild(st); }
+  st.textContent = `@media print { ${pageCss} #print-area > div:last-child { break-after: auto !important; } }`;
+  window.print();
+}
+
+/* ---------- Eventos ---------- */
+$('#q, #f-colegio').on('input change', renderLista);
+
+$('#lista').on('change', '.js-sel', function () {
+  const tr = $(this).closest('tr');
+  const id = +tr.data('id');
+  if (this.checked) seleccion.set(id, Math.max(1, parseInt(tr.find('.js-qty').val()) || 1));
+  else seleccion.delete(id);
+  tr.toggleClass('is-sel', this.checked);
+  actualizar();
+});
+
+$('#lista').on('input', '.js-qty', function () {
+  const tr = $(this).closest('tr');
+  const id = +tr.data('id');
+  const q = Math.min(999, Math.max(1, parseInt(this.value) || 1));
+  seleccion.set(id, q);
+  tr.addClass('is-sel').find('.js-sel').prop('checked', true);
+  actualizar();
+});
+
+$('#lista').on('click', 'td:not(:first-child):not(:last-child)', function () {
+  $(this).closest('tr').find('.js-sel:not(:disabled)').click();
+}).css('cursor', 'pointer');
+
+$('#sel-todos').on('change', function () {
+  const on = this.checked;
+  visibles().filter(p => App.codigoValido(p.codigo)).forEach(p => {
+    if (on) { if (!seleccion.has(p.id)) seleccion.set(p.id, 1); } else seleccion.delete(p.id);
+  });
+  renderLista();
+  actualizar();
+});
+
+$('[data-qty]').on('click', function () {
+  if (!seleccion.size) { App.toast('Primero selecciona productos', 'info'); return; }
+  const modo = $(this).data('qty');
+  seleccion.forEach((q, id) => {
+    const p = productos.find(x => x.id === id);
+    seleccion.set(id, modo === 'stock' ? Math.max(1, p.stock) : 1);
+  });
+  renderLista();
+  actualizar();
+});
+
+$('#formato, #o-colegio, #o-precio, #inicio').on('change input', actualizar);
+$('#btn-imprimir').on('click', imprimir);
+
+$('#btn-asignar').on('click', function () {
+  const n = $('#n-sin-codigo').text();
+  if (!confirm(`Se generará un código nuevo para ${n} producto(s) sin código. ¿Continuar?`)) return;
+  const btn = $(this).prop('disabled', true);
+  $.ajax({ url: "{% url 'asignar_codigos' %}", method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' } })
+    .done(r => { App.toast(r.asignados === 1 ? 'Se asignó 1 código' : `Se asignaron ${r.asignados} códigos`, 'success'); cargar(); })
+    .fail(() => App.toast('No se pudieron asignar los códigos', 'error'))
+    .always(() => btn.prop('disabled', false));
+});
+
+/* ---------- Inicio ---------- */
+$('#formato').html(Object.entries(FORMATOS).map(([k, f]) => `<option value="${k}">${f.nombre}</option>`).join(''));
+cargarPrefs();
+const idsUrl = (new URLSearchParams(location.search).get('ids') || '').split(',').map(Number).filter(Boolean);
+cargar().then(() => {
+  idsUrl.forEach(id => { const p = productos.find(x => x.id === id); if (p && App.codigoValido(p.codigo)) seleccion.set(id, Math.max(1, p.stock)); });
+  if (idsUrl.length) { renderLista(); actualizar(); }
+});
+</script>
+{% endblock %}
