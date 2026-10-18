@@ -1,0 +1,29 @@
+<div class="form-shell">
+  <a href="{{ volver_url }}" class="d-inline-flex align-items-center gap-1 mb-3 text-secondary"><i class="bi bi-arrow-left"></i> Volver a {{ plural|lower }}</a>
+  <div class="panel">
+    <div class="panel-header">
+      <div>
+        <h2 class="panel-title">{% if form.instance.pk %}Editar {{ singular|lower }}{% else %}{{ nuevo_txt }}{% endif %}</h2>
+        <p class="panel-sub">{% if form.instance.pk %}Modifica el nombre y guarda los cambios.{% else %}Completa los datos para agregarlo al catálogo.{% endif %}</p>
+      </div>
+    </div>
+    <form method="post" class="app-form" novalidate>
+      {% csrf_token %}
+      <div class="panel-body">
+        {{ form.non_field_errors }}
+        {% for field in form %}
+          <div class="mb-3">
+            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {{ field.errors }}
+          </div>
+        {% endfor %}
+      </div>
+      <div class="modal-footer justify-content-between">
+        <a href="{{ volver_url }}" class="btn btn-light-border">Cancelar</a>
+        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>{% if form.instance.pk %}Guardar cambios{% else %}Guardar{% endif %}</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>document.addEventListener('DOMContentLoaded', () => { const f = document.querySelector('.app-form input[type=text]'); if (f) f.focus(); });</script>

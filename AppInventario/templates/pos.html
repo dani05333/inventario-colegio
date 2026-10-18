@@ -1,98 +1,267 @@
-{% extends 'inicio.html' %}
+{% extends 'base.html' %}
+{% block title %}Punto de venta{% endblock %}
+{% block page_title %}Punto de venta{% endblock %}
+{% block page_subtitle %}Escanea o busca productos para agregarlos a la venta{% endblock %}
+{% block content_class %}pos-content{% endblock %}
+{% block topbar_actions %}
+<div class="cd-controls">
+  <button type="button" class="btn btn-light-border" id="btn-abrir-cliente" title="Abrir la pantalla del cliente (segunda pantalla)">
+    <i class="bi bi-display"></i><span class="cd-text">Pantalla cliente</span><span class="cd-dot" id="cd-dot"></span>
+  </button>
+  <button type="button" class="btn btn-cd-visible" id="btn-visible-cliente" title="Mostrar u ocultar la venta en la pantalla del cliente (F7)">
+    <i class="bi bi-eye"></i><span class="cd-text">El cliente ve la venta</span>
+  </button>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+  .pos-content { padding-bottom: 26px; }
+  .pos-layout { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 20px; align-items: start; }
+  @media (max-width: 1399.98px) { .pos-layout { grid-template-columns: minmax(0, 1fr) 360px; } }
+  @media (max-width: 1199.98px) { .pos-layout { grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; } }
+  @media (max-width: 991.98px) { .pos-layout { grid-template-columns: 1fr; } }
+
+  /* Controles de la pantalla del cliente (barra superior) */
+  .cd-controls { display: flex; gap: 8px; align-items: center; }
+  .cd-controls .btn { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; position: relative; }
+  .cd-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border-strong); position: absolute; top: 5px; right: 5px; }
+  .cd-dot.on { background: #22c55e; box-shadow: 0 0 0 2px #fff; }
+  .btn-cd-visible { background: var(--success-50); color: var(--success); border: 1px solid #bfe8cf; }
+  .btn-cd-visible:hover { background: #dcf5e6; color: var(--success); }
+  .btn-cd-oculto { background: var(--warning-50); color: var(--warning); border: 1px solid #f3d9a8; }
+  .btn-cd-oculto:hover { background: #fdeccc; color: var(--warning); }
+  @media (max-width: 1199.98px) { .cd-controls .cd-text { display: none; } }
+  @media (max-width: 991.98px) { .cd-controls { display: none; } }
+
+  .scan-bar { display: flex; gap: 10px; }
+  .scan-bar .search-box { flex: 1; }
+  .scan-bar .form-control { height: 54px; font-size: 17px; border-radius: 14px; padding-left: 48px; }
+  .scan-bar .search-box > i { left: 17px; font-size: 20px; color: var(--primary); }
+
+  .chips { display: flex; gap: 8px; overflow-x: auto; padding: 14px 0 4px; scrollbar-width: thin; }
+  .chip {
+    flex: none; border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
+    border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .chip:hover { border-color: var(--border-strong); color: var(--text); }
+  .chip.active { background: var(--text); border-color: var(--text); color: #fff; }
+
+  .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin-top: 14px; }
+  .product-card {
+    text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 14px; cursor: pointer; transition: border-color .12s, box-shadow .12s, transform .06s;
+    display: flex; flex-direction: column; gap: 6px; min-height: 132px;
+  }
+  .product-card:hover { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-50); }
+  .product-card:active { transform: scale(.98); }
+  .product-card.out { opacity: .5; cursor: not-allowed; }
+  .product-card.out:hover { border-color: var(--border); box-shadow: none; }
+  .product-card .p-name { font-weight: 650; line-height: 1.25; }
+  .product-card .p-school { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .product-card .p-foot { margin-top: auto; display: flex; align-items: end; justify-content: space-between; gap: 6px; }
+  .product-card .p-price { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .product-card .p-stock { font-size: 12px; color: var(--muted); }
+  .product-card .p-stock.low { color: var(--warning); font-weight: 600; }
+  .product-card .p-incart {
+    position: absolute; top: 10px; right: 10px; min-width: 22px; height: 22px; border-radius: 999px;
+    background: var(--primary); color: #fff; font-size: 12px; font-weight: 700; display: grid; place-items: center; padding: 0 6px;
+  }
+
+  .ticket {
+    position: sticky; top: calc(var(--topbar-h) + 20px);
+    height: calc(100vh - var(--topbar-h) - 46px); min-height: 460px;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  @media (max-width: 991.98px) { .ticket { position: static; height: auto; min-height: 0; } }
+  .ticket-items { flex: 1; overflow-y: auto; }
+  .ticket-item { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; padding: 12px 18px; border-bottom: 1px solid var(--border); }
+  .ticket-item .t-name { font-weight: 600; line-height: 1.25; }
+  .ticket-item .t-sub { font-size: 12.5px; color: var(--muted); }
+  .ticket-item .t-total { font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+  .ticket-item .t-row { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; }
+  .stepper { display: inline-flex; align-items: center; border: 1px solid var(--border-strong); border-radius: 10px; overflow: hidden; }
+  .stepper button { border: 0; background: var(--surface); width: 32px; height: 30px; color: var(--text-2); font-size: 16px; }
+  .stepper button:hover { background: var(--surface-2); color: var(--text); }
+  .stepper input { width: 42px; height: 30px; border: 0; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; -moz-appearance: textfield; }
+  .stepper input::-webkit-outer-spin-button, .stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .t-unit { font-size: 12.5px; color: var(--muted); }
+  .ticket-flash { animation: flash .6s ease-out; }
+  @keyframes flash { from { background: var(--primary-50); } to { background: transparent; } }
+
+  .ticket-foot { border-top: 1px solid var(--border); padding: 16px 18px 18px; background: var(--surface-2); }
+  .sum-row { display: flex; justify-content: space-between; color: var(--text-2); font-size: 13.5px; margin-bottom: 4px; }
+  .total-row { display: flex; justify-content: space-between; align-items: baseline; margin: 8px 0 14px; }
+  .total-row .label { font-weight: 600; font-size: 15px; }
+  .total-row .amount { font-size: 32px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .btn-cobrar { height: 58px; font-size: 18px; border-radius: 14px; }
+
+  .pay-total { text-align: center; padding: 6px 0 18px; }
+  .pay-total .pay-lbl { color: var(--muted); font-size: 13px; }
+  .pay-total .amt { font-size: 40px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .bills { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+  .change-box { margin-top: 16px; border-radius: 14px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; background: var(--surface-2); }
+  .change-box .amt { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .change-box.ok { background: var(--success-50); color: var(--success); }
+  .change-box.bad { background: var(--danger-50); color: var(--danger); }
+  #monto-recibido { height: 54px; font-size: 22px; font-weight: 700; text-align: right; }
+  .metodos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 18px; }
+  .metodo {
+    border: 1.5px solid var(--border-strong); background: var(--surface); border-radius: 12px;
+    padding: 10px 4px 8px; display: flex; flex-direction: column; align-items: center; gap: 4px;
+    font-weight: 600; font-size: 13px; color: var(--text-2); position: relative;
+  }
+  .metodo i { font-size: 22px; }
+  .metodo:hover { border-color: var(--primary); color: var(--text); }
+  .metodo.active { border-color: var(--primary); background: var(--primary-50); color: var(--primary); box-shadow: 0 0 0 3px rgba(98, 80, 214, .12); }
+  .metodo kbd { position: absolute; top: 4px; right: 6px; font-size: 10px; padding: 0 4px; background: transparent; color: var(--muted); box-shadow: none; }
+  .card-info { display: flex; gap: 10px; align-items: flex-start; background: var(--primary-50); color: var(--primary-600); border-radius: 12px; padding: 14px 16px; font-size: 14px; }
+  .card-info i { font-size: 18px; line-height: 1.2; }
+
+  /* Pantallas bajas (768 px): todo un poco más compacto para que el ticket y el botón Cobrar quepan */
+  @media (max-height: 800px) and (min-width: 992px) {
+    .scan-bar .form-control { height: 48px; font-size: 16px; }
+    .chips { padding-top: 10px; }
+    .product-grid { gap: 10px; margin-top: 10px; }
+    .product-card { min-height: 112px; padding: 11px 12px; gap: 4px; }
+    .product-card .p-price { font-size: 15px; }
+    .ticket { top: calc(var(--topbar-h) + 18px); height: calc(100vh - var(--topbar-h) - 36px); min-height: 400px; }
+    .ticket .panel-header { padding: 12px 16px; }
+    .ticket-item { padding: 10px 16px; }
+    .ticket-foot { padding: 12px 16px 14px; }
+    .total-row { margin: 4px 0 10px; }
+    .total-row .amount { font-size: 28px; }
+    .btn-cobrar { height: 50px; font-size: 17px; }
+  }
+
+  .mobile-bar { display: none; }
+  @media (max-width: 991.98px) {
+    .pos-content { padding-bottom: 96px; }
+    .mobile-bar {
+      display: flex; align-items: center; gap: 12px;
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 1020;
+      padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+      background: var(--surface); border-top: 1px solid var(--border); box-shadow: 0 -6px 20px rgba(20, 24, 40, .06);
+    }
+    .mobile-bar .mb-info { flex: 1; min-width: 0; line-height: 1.2; }
+    .mobile-bar .mb-total { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .mobile-bar .mb-sub { font-size: 12.5px; color: var(--muted); }
+  }
+
+  .success-icon { width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; margin: 4px auto 14px; background: var(--success-50); color: var(--success); font-size: 36px; }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="container my-5">
-  <div class="row">
-    <!-- Panel Izquierdo: Escaneo y Carrito -->
-    <div class="col-md-8">
-      <div class="card shadow-sm mb-4">
-        <div class="card-body">
-          <div class="input-group input-group-lg">
-            <input type="text" id="codigo-barras" class="form-control shadow-sm" placeholder="Escanea o ingresa el código de barras" autofocus>
-            <button id="btn-agregar" class="btn btn-primary px-4">Agregar</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="card shadow-sm">
-        <div class="card-header bg-light d-flex justify-content-between align-items-center">
-          <h4 class="mb-0">Carrito de Compras</h4>
-          <button id="btn-vaciar" class="btn btn-sm btn-outline-danger">Vaciar</button>
-        </div>
-        <div class="card-body p-0">
-          <table class="table table-striped mb-0">
-            <thead class="table-light">
-              <tr>
-                <th>Producto</th>
-                <th>Talla</th>
-                <th>Cantidad</th>
-                <th>Precio</th>
-                <th>Subtotal</th>
-                <th>Eliminar</th>
-              </tr>
-            </thead>
-            <tbody id="carrito-body"></tbody>
-          </table>
-        </div>
+<div class="pos-layout">
+  <!-- Productos -->
+  <section>
+    <div class="scan-bar">
+      <div class="search-box">
+        <i class="bi bi-upc-scan"></i>
+        <input type="text" id="buscador" class="form-control" placeholder="Escanea el código o escribe para buscar…" autocomplete="off" autofocus>
       </div>
     </div>
-
-    <!-- Panel Derecho: Total y Vender -->
-    <div class="col-md-4">
-      <div class="card shadow-sm text-center mb-4">
-        <div class="card-body">
-          <h2 class="text-muted">Total</h2>
-          <h1 id="total" class="display-3 fw-bold">$0.00</h1>
-        </div>
-      </div>
-      <button id="btn-vender" class="btn btn-success btn-lg w-100 shadow-sm">VENDER</button>
+    <div class="d-flex justify-content-between align-items-center mt-2 small text-secondary">
+      <span id="resultado-info">Cargando productos…</span>
+      <span class="d-none d-xl-inline"><kbd class="key dark">F2</kbd> buscar · <kbd class="key dark">Enter</kbd> agregar · <kbd class="key dark">F9</kbd> cobrar · <kbd class="key dark">F7</kbd> ocultar al cliente</span>
     </div>
-  </div>
+    <div class="chips" id="chips"></div>
+    <div class="product-grid" id="grid"></div>
+    <div class="empty d-none" id="grid-empty">
+      <i class="bi bi-search"></i>
+      <strong>Sin resultados</strong>
+      Prueba con otro nombre, colegio o código.
+    </div>
+  </section>
+
+  <!-- Ticket -->
+  <aside class="panel ticket">
+    <div class="panel-header">
+      <div>
+        <h2 class="panel-title">Venta actual</h2>
+        <p class="panel-sub" id="ticket-sub">Sin productos</p>
+      </div>
+      <button class="btn btn-sm btn-light-border" id="btn-vaciar" disabled><i class="bi bi-trash3 me-1"></i>Vaciar</button>
+    </div>
+    <div class="ticket-items" id="ticket-items"></div>
+    <div class="ticket-foot">
+      <div class="sum-row"><span>Unidades</span><span class="tabular" id="sum-unidades">0</span></div>
+      <div class="total-row"><span class="label">Total</span><span class="amount" id="sum-total">$0</span></div>
+      <button class="btn btn-primary w-100 btn-cobrar" id="btn-cobrar" disabled>
+        <i class="bi bi-cash-coin me-2"></i>Cobrar <kbd class="key">F9</kbd>
+      </button>
+    </div>
+  </aside>
 </div>
 
-<!-- Modal de Alerta -->
-<div class="modal fade" id="alertModal" tabindex="-1" aria-labelledby="alertModalLabel" aria-hidden="true">
+<!-- Barra inferior (solo pantallas pequeñas) -->
+<div class="mobile-bar">
+  <button type="button" class="mb-info text-start border-0 bg-transparent p-0" id="mb-ver">
+    <div class="mb-total" id="mb-total">$0</div>
+    <div class="mb-sub"><span id="mb-unidades">0 unidades</span> · ver venta <i class="bi bi-chevron-down"></i></div>
+  </button>
+  <button type="button" class="btn btn-primary btn-lg" id="mb-cobrar" disabled><i class="bi bi-cash-coin me-1"></i>Cobrar</button>
+</div>
+
+<!-- Modal cobro -->
+<div class="modal fade" id="modalCobro" tabindex="-1" aria-labelledby="modalCobroLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
-      <div class="modal-header bg-danger text-white">
-        <h5 class="modal-title" id="alertModalLabel">¡Atención!</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-      </div>
-      <div class="modal-body" id="alertModalBody">
-        <!-- Aquí se cargará el mensaje -->
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Modal Resumen de Venta -->
-<div class="modal fade" id="resumenVentaModal" tabindex="-1" aria-labelledby="resumenVentaLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-scrollable">
-    <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="resumenVentaLabel">Resumen de Venta</h5>
+        <h5 class="modal-title" id="modalCobroLabel">Cobrar venta</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
       <div class="modal-body">
-        <table class="table table-sm">
-          <thead>
-            <tr>
-              <th>Producto</th>
-              <th>Talla</th>
-              <th>Cant.</th>
-              <th>Subtotal</th>
-            </tr>
-          </thead>
-          <tbody id="resumen-carrito-body"></tbody>
-        </table>
-        <h4 class="text-end">Total: <span id="resumen-total"></span></h4>
+        <div class="pay-total">
+          <div class="pay-lbl">Total a pagar · <span id="cobro-unidades">0 unidades</span></div>
+          <div class="amt" id="cobro-total">$0</div>
+        </div>
+        <label class="form-label">Forma de pago</label>
+        <div class="metodos" id="metodos"></div>
+
+        <div id="cash-section">
+          <label class="form-label" for="monto-recibido">Efectivo recibido <span class="fw-normal text-secondary">(opcional, para calcular el vuelto)</span></label>
+          <input type="number" min="0" step="1" id="monto-recibido" class="form-control" placeholder="0" inputmode="numeric">
+          <div class="bills" id="bills"></div>
+          <div class="change-box" id="change-box">
+            <span class="fw-semibold" id="change-label">Vuelto</span>
+            <span class="amt" id="change-amt">—</span>
+          </div>
+        </div>
+
+        <div class="card-info d-none" id="card-section">
+          <i class="bi bi-info-circle"></i>
+          <span id="card-text">Cobra el total en la máquina de tarjetas y confirma cuando el pago esté aprobado.</span>
+        </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-        <button type="button" id="btn-confirmar-venta" class="btn btn-success">Confirmar Venta</button>
+        <button type="button" class="btn btn-light-border" data-bs-dismiss="modal">Volver</button>
+        <button type="button" class="btn btn-success btn-lg px-4" id="btn-confirmar"><i class="bi bi-check2-circle me-1"></i>Confirmar venta</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal venta exitosa -->
+<div class="modal fade" id="modalExito" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+      <div class="modal-body text-center pt-4">
+        <div class="success-icon"><i class="bi bi-check-lg"></i></div>
+        <h5 class="fw-bold mb-1">¡Venta registrada!</h5>
+        <div class="text-secondary mb-3" id="exito-num"></div>
+        <div class="d-flex justify-content-between"><span class="text-secondary">Total</span><strong class="tabular" id="exito-total"></strong></div>
+        <div class="d-flex justify-content-between"><span class="text-secondary">Pago</span><strong id="exito-metodo"></strong></div>
+        <div class="d-flex justify-content-between d-none" id="exito-vuelto-row"><span class="text-secondary">Vuelto</span><strong class="tabular text-success" id="exito-vuelto"></strong></div>
+      </div>
+      <div class="modal-footer flex-column gap-2">
+        <button class="btn btn-primary w-100" id="btn-nueva-venta">Nueva venta <kbd class="key">Enter</kbd></button>
+        <div class="d-flex gap-2 w-100">
+          <button class="btn btn-light-border flex-fill" id="btn-imprimir"><i class="bi bi-printer me-1"></i>Imprimir</button>
+          <button class="btn btn-light-border flex-fill" id="btn-pdf"><i class="bi bi-download me-1"></i>PDF</button>
+        </div>
+        <a class="small" id="link-boleta" href="#" target="_blank">Ver boleta <i class="bi bi-box-arrow-up-right"></i></a>
       </div>
     </div>
   </div>
@@ -100,159 +269,423 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+const UMBRAL = 10;
+const STORAGE_KEY = 'pos_carrito_v1';
+const MAX_CARDS = 120;
+
+let productos = [];
 let carrito = [];
+let colegioActivo = '';
+let ultimaVenta = null;
+let metodoPago = 'efectivo';
 
-// Buscar producto con Enter
-$('#codigo-barras').on('keypress', function(e){
-    if(e.which == 13){
-        buscarProducto();
-    }
-});
+const $buscador = $('#buscador');
+const modalCobro = new bootstrap.Modal('#modalCobro');
+const modalExito = new bootstrap.Modal('#modalExito');
 
-// Buscar producto con botón
-$('#btn-agregar').on('click', function(){
-    buscarProducto();
-});
+/* ---------- Persistencia del carrito (sobrevive a recargas) ---------- */
+function guardarCarrito() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(carrito)); } catch (e) {} }
+function cargarCarrito() { try { carrito = JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch (e) { carrito = []; } }
 
-function buscarProducto(){
-    let codigo = $('#codigo-barras').val();
-    if(codigo.trim() === ''){
-        mostrarAlerta('Ingrese un código de barras');
-        return;
-    }
-    $.ajax({
-        url: '{% url "buscar_producto" %}',
-        method: 'GET',
-        data: {codigo: codigo},
-        success: function(data){
-            if(data.found){
-                agregarAlCarrito(data.producto);
-            } else {
-                mostrarAlerta('Producto no encontrado');
-            }
-            $('#codigo-barras').val('').focus();
-        }
-    });
+/* ---------- Productos ---------- */
+function cargarProductos() {
+  return $.getJSON("{% url 'inventario_json' %}").then(res => {
+    productos = res.data.map(p => ({
+      id: p.id, codigo: String(p.codigo_barras), nombre: p.uniforme, talla: p.talla,
+      colegio: p.colegio, precio: p.precio_unitario, stock: p.cantidad,
+      _q: `${p.uniforme} ${p.talla} ${p.colegio} ${p.codigo_barras}`.toLowerCase()
+    }));
+    // Sincroniza el carrito guardado con el stock actual
+    carrito = carrito.filter(c => productos.some(p => p.id === c.id));
+    carrito.forEach(c => { const p = productos.find(x => x.id === c.id); c.stock = p.stock; c.precio = p.precio; });
+    renderChips();
+    renderGrid();
+    renderTicket();
+  }).fail(() => App.toast('No se pudieron cargar los productos', 'error'));
 }
 
-function agregarAlCarrito(producto){
-    let existente = carrito.find(p => p.id == producto.id);
-    if(existente){
-        existente.cantidad += 1;
-    } else {
-        carrito.push({...producto, cantidad: 1});
-    }
-    renderCarrito();
+function filtrar() {
+  const terms = $buscador.val().toLowerCase().trim().split(/\s+/).filter(Boolean);
+  return productos.filter(p =>
+    (!colegioActivo || p.colegio === colegioActivo) && terms.every(t => p._q.includes(t)));
 }
 
-function renderCarrito(){
-    let total = 0;
-    $('#carrito-body').empty();
-    carrito.forEach((item, index) => {
-        let subtotal = item.precio * item.cantidad;
-        total += subtotal;
-        $('#carrito-body').append(`
-            <tr>
-                <td>${item.nombre}</td>
-                <td>${item.talla}</td>
-                <td>
-                  <input type="number" min="1" value="${item.cantidad}" class="form-control form-control-sm cantidad-input" data-index="${index}">
-                </td>
-                <td>$${item.precio.toFixed(0)}</td>
-                <td>$${subtotal.toFixed(0)}</td>
-                <td><button class="btn btn-sm btn-danger btn-eliminar" data-index="${index}">X</button></td>
-            </tr>
-        `);
-    });
-    $('#total').text('$' + total.toFixed(0));
+function renderChips() {
+  const colegios = [...new Set(productos.map(p => p.colegio))].sort((a, b) => a.localeCompare(b));
+  const html = [`<button class="chip ${colegioActivo ? '' : 'active'}" data-colegio="">Todos</button>`]
+    .concat(colegios.map(c => `<button class="chip ${c === colegioActivo ? 'active' : ''}" data-colegio="${App.esc(c)}">${App.esc(c)}</button>`));
+  $('#chips').html(colegios.length > 1 ? html.join('') : '');
 }
 
-$(document).on('change', '.cantidad-input', function(){
-    let index = $(this).data('index');
-    let nuevaCantidad = parseInt($(this).val());
-    if(nuevaCantidad > 0){
-        carrito[index].cantidad = nuevaCantidad;
-    } else {
-        carrito[index].cantidad = 1;
-        $(this).val(1);
-    }
-    renderCarrito();
-});
+function renderGrid() {
+  const lista = filtrar();
+  const enCarrito = Object.fromEntries(carrito.map(c => [c.id, c.cantidad]));
+  const html = lista.slice(0, MAX_CARDS).map(p => {
+    const out = p.stock <= 0;
+    const low = !out && p.stock < UMBRAL;
+    return `
+      <button class="product-card position-relative ${out ? 'out' : ''}" data-id="${p.id}" ${out ? 'aria-disabled="true"' : ''}>
+        ${enCarrito[p.id] ? `<span class="p-incart">${enCarrito[p.id]}</span>` : ''}
+        <span class="badge-soft badge-muted align-self-start">Talla ${App.esc(p.talla)}</span>
+        <span class="p-name">${App.esc(p.nombre)}</span>
+        <span class="p-school">${App.esc(p.colegio)}</span>
+        <span class="p-foot">
+          <span class="p-price">${App.money(p.precio)}</span>
+          <span class="p-stock ${low ? 'low' : ''}">${out ? 'Agotado' : p.stock + ' disp.'}</span>
+        </span>
+      </button>`;
+  }).join('');
+  $('#grid').html(html);
+  $('#grid-empty').toggleClass('d-none', lista.length > 0 || productos.length === 0);
 
-$(document).on('click', '.btn-eliminar', function(){
-    let index = $(this).data('index');
-    carrito.splice(index, 1);
-    renderCarrito();
-});
-
-$('#btn-vaciar').on('click', function(){
-    if(confirm('¿Estás seguro de vaciar el carrito?')){
-        carrito = [];
-        renderCarrito();
-    }
-});
-
-// Vender: Mostrar Modal Resumen antes de enviar al backend
-$('#btn-vender').on('click', function(){
-    if(carrito.length === 0){
-        mostrarAlerta('No hay productos en el carrito');
-        return;
-    }
-
-    // Llenar resumen modal
-    let total = 0;
-    $('#resumen-carrito-body').empty();
-    carrito.forEach(item => {
-        let subtotal = item.precio * item.cantidad;
-        total += subtotal;
-        $('#resumen-carrito-body').append(`
-            <tr>
-                <td>${item.nombre}</td>
-                <td>${item.talla}</td>
-                <td>${item.cantidad}</td>
-                <td>$${subtotal.toFixed(0)}</td>
-            </tr>
-        `);
-    });
-    $('#resumen-total').text('$' + total.toFixed(0));
-
-    var resumenModal = new bootstrap.Modal(document.getElementById('resumenVentaModal'));
-    resumenModal.show();
-});
-
-// Confirmar Venta desde el Modal
-$('#btn-confirmar-venta').on('click', function(){
-    $.ajax({
-        url: '{% url "registrar_venta" %}',
-        method: 'POST',
-        contentType: 'application/json',
-        headers: {'X-CSRFToken': '{{ csrf_token }}'},
-        data: JSON.stringify({carrito: carrito}),
-        success: function(){
-            mostrarAlerta('Venta realizada con éxito', 'success');
-            carrito = [];
-            renderCarrito();
-            var resumenModal = bootstrap.Modal.getInstance(document.getElementById('resumenVentaModal'));
-            resumenModal.hide();
-        },
-        error: function(xhr){
-            if(xhr.status === 400){
-                const errorData = JSON.parse(xhr.responseText);
-                mostrarAlerta(errorData.message || 'No hay suficiente stock');
-            } else {
-                mostrarAlerta('Error inesperado al registrar la venta');
-            }
-        }
-    });
-});
-
-function mostrarAlerta(mensaje, tipo = 'danger'){
-    $('#alertModalBody').text(mensaje);
-    $('#alertModal .modal-header').removeClass('bg-danger bg-success').addClass(tipo === 'success' ? 'bg-success' : 'bg-danger');
-    var alertModal = new bootstrap.Modal(document.getElementById('alertModal'));
-    alertModal.show();
+  if (productos.length === 0) {
+    $('#resultado-info').html('No hay productos en el inventario. <a href="{% url "crear_inventario" %}">Agrega el primero</a>.');
+  } else {
+    const extra = lista.length > MAX_CARDS ? ` (mostrando ${MAX_CARDS}, afina la búsqueda)` : '';
+    $('#resultado-info').text(`${lista.length} producto${lista.length === 1 ? '' : 's'}${extra}`);
+  }
 }
+
+/* ---------- Carrito ---------- */
+function agregar(id) {
+  const p = productos.find(x => x.id === id);
+  if (!p) return;
+  const item = carrito.find(c => c.id === id);
+  const actual = item ? item.cantidad : 0;
+  if (actual + 1 > p.stock) {
+    App.toast(p.stock <= 0 ? `${p.nombre} talla ${p.talla} está agotado` : `Solo quedan ${p.stock} de ${p.nombre} talla ${p.talla}`, 'warning');
+    return;
+  }
+  if (item) {
+    item.cantidad++;
+    carrito.splice(carrito.indexOf(item), 1);
+    carrito.unshift(item);
+  } else {
+    carrito.unshift({ id: p.id, nombre: p.nombre, talla: p.talla, colegio: p.colegio, precio: p.precio, stock: p.stock, cantidad: 1 });
+  }
+  faseCliente = 'venta';
+  renderTicket(id);
+  renderGrid();
+}
+
+function setCantidad(id, n) {
+  const item = carrito.find(c => c.id === id);
+  if (!item) return;
+  n = Math.floor(Number(n) || 0);
+  if (n <= 0) { quitar(id); return; }
+  if (n > item.stock) { App.toast(`Solo hay ${item.stock} en stock`, 'warning'); n = item.stock; }
+  item.cantidad = n;
+  renderTicket();
+  renderGrid();
+}
+
+function quitar(id) {
+  carrito = carrito.filter(c => c.id !== id);
+  renderTicket();
+  renderGrid();
+}
+
+function totales() {
+  return carrito.reduce((a, c) => ({ total: a.total + c.precio * c.cantidad, unidades: a.unidades + c.cantidad }), { total: 0, unidades: 0 });
+}
+
+function renderTicket(flashId) {
+  const { total, unidades } = totales();
+  if (carrito.length === 0) {
+    $('#ticket-items').html(`
+      <div class="empty" style="padding-top:60px">
+        <i class="bi bi-cart3"></i>
+        <strong>La venta está vacía</strong>
+        Escanea un código o toca un producto.
+      </div>`);
+  } else {
+    $('#ticket-items').html(carrito.map(c => `
+      <div class="ticket-item ${c.id === flashId ? 'ticket-flash' : ''}" data-id="${c.id}">
+        <div>
+          <div class="t-name">${App.esc(c.nombre)} <span class="badge-soft badge-muted ms-1">${App.esc(c.talla)}</span></div>
+          <div class="t-sub">${App.esc(c.colegio)}</div>
+        </div>
+        <div class="t-total">${App.money(c.precio * c.cantidad)}</div>
+        <div class="t-row">
+          <div class="d-flex align-items-center gap-2">
+            <div class="stepper">
+              <button type="button" class="js-menos" aria-label="Restar"><i class="bi bi-dash"></i></button>
+              <input type="number" class="js-cant" value="${c.cantidad}" min="1" max="${c.stock}" aria-label="Cantidad">
+              <button type="button" class="js-mas" aria-label="Sumar"><i class="bi bi-plus"></i></button>
+            </div>
+            <span class="t-unit">× ${App.money(c.precio)}</span>
+          </div>
+          <button type="button" class="btn-icon danger js-quitar" title="Quitar"><i class="bi bi-x-lg"></i></button>
+        </div>
+      </div>`).join(''));
+  }
+  $('#sum-unidades').text(App.num(unidades));
+  $('#sum-total').text(App.money(total));
+  $('#ticket-sub').text(carrito.length ? `${carrito.length} producto${carrito.length === 1 ? '' : 's'} distinto${carrito.length === 1 ? '' : 's'}` : 'Sin productos');
+  $('#btn-cobrar, #btn-vaciar, #mb-cobrar').prop('disabled', carrito.length === 0);
+  $('#mb-total').text(App.money(total));
+  $('#mb-unidades').text(`${App.num(unidades)} unidad${unidades === 1 ? '' : 'es'}`);
+  guardarCarrito();
+  publicarCliente(flashId);
+}
+
+/* ---------- Búsqueda / escáner ---------- */
+$buscador.on('input', renderGrid);
+
+$buscador.on('keydown', function (e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const q = this.value.trim();
+    if (!q) { if (carrito.length) abrirCobro(); return; }
+    const exacto = productos.find(p => p.codigo === q);
+    const lista = filtrar();
+    if (exacto) agregar(exacto.id);
+    else if (lista.length === 1) agregar(lista[0].id);
+    else if (lista.length === 0) { App.toast(`No se encontró “${q}”`, 'error'); }
+    else { App.toast('Hay varios resultados, elige uno de la lista', 'info'); return; }
+    this.value = '';
+    renderGrid();
+  } else if (e.key === 'Escape') {
+    this.value = '';
+    renderGrid();
+  }
+});
+
+$('#chips').on('click', '.chip', function () {
+  colegioActivo = $(this).data('colegio');
+  renderChips();
+  renderGrid();
+  $buscador.focus();
+});
+
+$('#grid').on('click', '.product-card', function () {
+  agregar(Number($(this).data('id')));
+  $buscador.focus();
+});
+
+$('#ticket-items')
+  .on('click', '.js-mas', function () { const id = +$(this).closest('.ticket-item').data('id'); const c = carrito.find(x => x.id === id); setCantidad(id, c.cantidad + 1); })
+  .on('click', '.js-menos', function () { const id = +$(this).closest('.ticket-item').data('id'); const c = carrito.find(x => x.id === id); setCantidad(id, c.cantidad - 1); })
+  .on('change', '.js-cant', function () { setCantidad(+$(this).closest('.ticket-item').data('id'), this.value); })
+  .on('click', '.js-quitar', function () { quitar(+$(this).closest('.ticket-item').data('id')); });
+
+$('#btn-vaciar').on('click', function () {
+  if (confirm('¿Vaciar la venta actual?')) { carrito = []; faseCliente = 'venta'; renderTicket(); renderGrid(); $buscador.focus(); }
+});
+
+/* ---------- Cobro ---------- */
+function abrirCobro() {
+  if (!carrito.length) return;
+  const { total, unidades } = totales();
+  $('#cobro-total').text(App.money(total));
+  $('#cobro-unidades').text(`${unidades} unidad${unidades === 1 ? '' : 'es'}`);
+  $('#monto-recibido').val('');
+
+  // Billetes sugeridos: exacto + los siguientes montos redondos
+  const opciones = new Set([total]);
+  [1000, 2000, 5000, 10000, 20000].forEach(b => opciones.add(Math.ceil(total / b) * b));
+  const bills = [...opciones].filter(v => v >= total).sort((a, b) => a - b).slice(0, 4);
+  $('#bills').html(bills.map((v, i) => `<button type="button" class="btn btn-light-border js-bill" data-v="${v}">${i === 0 ? 'Exacto' : App.money(v)}</button>`).join(''));
+
+  faseCliente = 'cobro';
+  $('#metodos').html(Object.entries(App.METODOS_PAGO).map(([k, m], i) => `
+    <button type="button" class="metodo js-metodo" data-metodo="${k}"><kbd>${i + 1}</kbd><i class="bi ${m.icono}"></i>${m.nombre}</button>`).join(''));
+  setMetodo('efectivo', false);
+  modalCobro.show();
+}
+
+/* Forma de pago: con efectivo se muestra la calculadora de vuelto; con tarjeta o transferencia, no */
+function setMetodo(metodo, enfocar = true) {
+  metodoPago = metodo;
+  const efectivo = metodo === 'efectivo';
+  $('.js-metodo').removeClass('active').filter(`[data-metodo="${metodo}"]`).addClass('active');
+  $('#cash-section').toggleClass('d-none', !efectivo);
+  $('#card-section').toggleClass('d-none', efectivo);
+  $('#card-text').text(metodo === 'transferencia'
+    ? 'Verifica que la transferencia haya llegado a la cuenta y luego confirma la venta.'
+    : `Cobra el total con ${App.METODOS_PAGO[metodo].nombre.toLowerCase()} en la máquina de tarjetas y confirma cuando el pago esté aprobado.`);
+  if (!efectivo) $('#monto-recibido').val('');
+  actualizarVuelto();
+  if (enfocar) (efectivo ? $('#monto-recibido') : $('#btn-confirmar')).focus();
+}
+
+function actualizarVuelto() {
+  const { total } = totales();
+  const raw = $('#monto-recibido').val();
+  const recibido = Number(raw);
+  const box = $('#change-box').removeClass('ok bad');
+  publicarCliente();
+  if (metodoPago !== 'efectivo') { $('#btn-confirmar').prop('disabled', false); return; }
+  if (raw === '') { $('#change-label').text('Vuelto'); $('#change-amt').text('—'); $('#btn-confirmar').prop('disabled', false); return; }
+  if (recibido < total) {
+    box.addClass('bad'); $('#change-label').text('Falta'); $('#change-amt').text(App.money(total - recibido));
+    $('#btn-confirmar').prop('disabled', true);
+  } else {
+    box.addClass('ok'); $('#change-label').text('Vuelto'); $('#change-amt').text(App.money(recibido - total));
+    $('#btn-confirmar').prop('disabled', false);
+  }
+}
+
+$('#btn-cobrar, #mb-cobrar').on('click', abrirCobro);
+$('#mb-ver').on('click', () => document.querySelector('.ticket').scrollIntoView({ behavior: 'smooth' }));
+$('#modalCobro').on('shown.bs.modal', () => $('#monto-recibido').focus());
+$('#metodos').on('click', '.js-metodo', function () { setMetodo($(this).data('metodo')); });
+// Teclas 1 a 4 eligen la forma de pago (salvo mientras se escribe el monto recibido)
+$('#modalCobro').on('keydown', function (e) {
+  if (e.target.id === 'monto-recibido') return;
+  const i = Number(e.key) - 1;
+  const claves = Object.keys(App.METODOS_PAGO);
+  if (i >= 0 && i < claves.length) { e.preventDefault(); setMetodo(claves[i]); }
+});
+$('#modalCobro').on('hidden.bs.modal', () => {
+  if (faseCliente === 'cobro') { faseCliente = 'venta'; publicarCliente(); }   // se cerró sin cobrar
+  if (!$('#modalExito').hasClass('show')) $buscador.focus();
+});
+$('#monto-recibido').on('input', actualizarVuelto).on('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#btn-confirmar').click(); } });
+$('#bills').on('click', '.js-bill', function () { $('#monto-recibido').val($(this).data('v')); actualizarVuelto(); $('#btn-confirmar').focus(); });
+
+$('#btn-confirmar').on('click', function () {
+  const btn = $(this);
+  if (btn.prop('disabled')) return;
+  const { total } = totales();
+  const raw = $('#monto-recibido').val();
+  const recibido = metodoPago !== 'efectivo' || raw === '' ? null : Number(raw);
+  const metodo = metodoPago;
+  const items = carrito.map(c => ({ ...c, subtotal: c.precio * c.cantidad }));
+
+  btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Registrando…');
+  $.ajax({
+    url: "{% url 'registrar_venta' %}",
+    method: 'POST',
+    contentType: 'application/json',
+    headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+    data: JSON.stringify({ metodo_pago: metodo, carrito: carrito.map(c => ({ id: c.id, cantidad: c.cantidad })) })
+  }).done(function (res) {
+    // El total oficial es el que calcula el servidor con los precios de la base de datos
+    const totalServidor = typeof res.total === 'number' ? res.total : total;
+    ultimaVenta = { id: res.venta_id, fecha: new Date(), total: totalServidor, items, metodo_pago: metodo, recibido, vuelto: recibido !== null ? recibido - totalServidor : null };
+    $('#exito-metodo').text(App.METODOS_PAGO[metodo].nombre);
+    $('#link-boleta').attr('href', "{% url 'boleta' 0 %}".replace('/0/', '/' + res.venta_id + '/'));
+    faseCliente = 'gracias';
+    graciasCliente = { total: totalServidor, recibido, vuelto: ultimaVenta.vuelto, metodo: App.METODOS_PAGO[metodo].nombre };
+    carrito = [];
+    $buscador.val('');
+    renderTicket();
+    modalCobro.hide();
+    $('#exito-num').text(res.venta_id ? `Boleta N° ${res.venta_id}` : '');
+    $('#exito-total').text(App.money(totalServidor));
+    $('#exito-vuelto-row').toggleClass('d-none', recibido === null);
+    $('#exito-vuelto').text(App.money(ultimaVenta.vuelto || 0));
+    modalExito.show();
+    cargarProductos();
+  }).fail(function (xhr) {
+    const msg = (xhr.responseJSON && xhr.responseJSON.message) || 'No se pudo registrar la venta. Intenta nuevamente.';
+    App.toast(msg, 'error', 5000);
+    cargarProductos();
+  }).always(function () {
+    btn.prop('disabled', false).html('<i class="bi bi-check2-circle me-1"></i>Confirmar venta');
+  });
+});
+
+$('#modalExito').on('shown.bs.modal', () => $('#btn-nueva-venta').focus());
+$('#btn-nueva-venta').on('click', () => { modalExito.hide(); $buscador.focus(); });
+$('#btn-imprimir').on('click', () => { if (ultimaVenta) App.printReceipt(ultimaVenta); });
+$('#btn-pdf').on('click', async function () {
+  if (!ultimaVenta) return;
+  const btn = $(this).prop('disabled', true);
+  await App.downloadReceipt(ultimaVenta);
+  btn.prop('disabled', false);
+});
+
+/* ---------- Pantalla del cliente ----------
+   La pantalla del cliente es otra ventana del mismo navegador (/pantalla-cliente/).
+   Se comunican con BroadcastChannel, sin pasar por el servidor. */
+const CLIENTE_URL = "{% url 'pantalla_cliente' %}";
+const KEY_VISIBLE = 'pantalla_cliente_visible';
+const canalCliente = 'BroadcastChannel' in window ? new BroadcastChannel('pos-pantalla-cliente') : null;
+let faseCliente = 'venta';        // 'venta' | 'cobro' | 'gracias'
+let graciasCliente = null;
+let clienteVisible = true;
+let ultimoPingCliente = 0;
+try { clienteVisible = localStorage.getItem(KEY_VISIBLE) !== '0'; } catch (e) {}
+
+function publicarCliente(ultimoId) {
+  if (!canalCliente) return;
+  const { total, unidades } = totales();
+  const raw = $('#monto-recibido').val();
+  canalCliente.postMessage({
+    tipo: 'estado',
+    visible: clienteVisible,
+    fase: faseCliente,
+    items: carrito.map(c => ({ id: c.id, nombre: c.nombre, talla: c.talla, colegio: c.colegio, precio: c.precio, cantidad: c.cantidad, subtotal: c.precio * c.cantidad })),
+    total, unidades,
+    ultimoId: ultimoId || null,
+    recibido: faseCliente === 'cobro' && metodoPago === 'efectivo' && raw !== '' ? Number(raw) : null,
+    metodo: faseCliente === 'cobro' ? App.METODOS_PAGO[metodoPago].nombre : null,
+    efectivo: metodoPago === 'efectivo',
+    gracias: faseCliente === 'gracias' ? graciasCliente : null,
+  });
+}
+
+function pintarBotonVisible() {
+  $('#btn-visible-cliente')
+    .toggleClass('btn-cd-visible', clienteVisible).toggleClass('btn-cd-oculto', !clienteVisible)
+    .html(clienteVisible
+      ? '<i class="bi bi-eye"></i><span class="cd-text">El cliente ve la venta</span>'
+      : '<i class="bi bi-eye-slash"></i><span class="cd-text">Oculto al cliente</span>');
+}
+
+function alternarVisibleCliente() {
+  clienteVisible = !clienteVisible;
+  try { localStorage.setItem(KEY_VISIBLE, clienteVisible ? '1' : '0'); } catch (e) {}
+  pintarBotonVisible();
+  publicarCliente();
+  App.toast(clienteVisible ? 'La pantalla del cliente muestra la venta' : 'La venta quedó oculta para el cliente', clienteVisible ? 'success' : 'info', 2200);
+}
+
+async function abrirPantallaCliente() {
+  // Si el navegador lo permite, abre la ventana directamente en la otra pantalla
+  let opciones = 'popup,width=1024,height=640';
+  try {
+    if ('getScreenDetails' in window) {
+      const pantallas = await window.getScreenDetails();
+      const otra = pantallas.screens.find(s => s !== pantallas.currentScreen);
+      if (otra) opciones = `popup,left=${otra.availLeft},top=${otra.availTop},width=${otra.availWidth},height=${otra.availHeight}`;
+    }
+  } catch (e) { /* sin permiso: se abre normal y se arrastra a la otra pantalla */ }
+  const win = window.open(CLIENTE_URL, 'pantalla-cliente', opciones);
+  if (!win) App.toast('El navegador bloqueó la ventana. Permite las ventanas emergentes para este sitio.', 'warning', 5000);
+  else App.toast('Si no se abrió en la segunda pantalla, arrástrala allí y presiona F11', 'info', 5000);
+}
+
+if (canalCliente) {
+  canalCliente.onmessage = e => {
+    if (e.data && (e.data.tipo === 'hola' || e.data.tipo === 'ping')) {
+      ultimoPingCliente = Date.now();
+      $('#cd-dot').addClass('on');
+      if (e.data.tipo === 'hola') publicarCliente();
+    }
+  };
+  // Indicador verde: la pantalla del cliente está abierta
+  setInterval(() => $('#cd-dot').toggleClass('on', Date.now() - ultimoPingCliente < 8000), 3000);
+} else {
+  $('.cd-controls').hide();
+}
+
+$('#btn-visible-cliente').on('click', alternarVisibleCliente);
+$('#btn-abrir-cliente').on('click', abrirPantallaCliente);
+pintarBotonVisible();
+
+/* ---------- Atajos de teclado ---------- */
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'F7') { e.preventDefault(); alternarVisibleCliente(); }
+  if (e.key === 'F2') { e.preventDefault(); $buscador.focus().select(); }
+  if (e.key === 'F9') { e.preventDefault(); if (!$('.modal.show').length) abrirCobro(); }
+});
+
+cargarCarrito();
+renderTicket();
+cargarProductos();
 </script>
 {% endblock %}

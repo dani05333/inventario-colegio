@@ -1,103 +1,156 @@
-{% extends 'inicio.html' %}
+{% extends 'base.html' %}
+{% block title %}Inventario{% endblock %}
+{% block page_title %}Inventario{% endblock %}
+{% block page_subtitle %}Stock, precios y códigos de barras{% endblock %}
+{% block topbar_actions %}
+<a href="{% url 'etiquetas' %}" class="btn btn-light-border d-none d-md-inline-block"><i class="bi bi-upc me-1"></i>Etiquetas</a>
+<a href="{% url 'crear_inventario' %}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Agregar producto</a>
+{% endblock %}
+
 {% block content %}
-
-<div class="container mt-4">
-    <div class="d-flex justify-content-between mb-3">
-        <h2>Inventario</h2>
-        <a href="{% url 'crear_inventario' %}" class="btn btn-success">Agregar Inventario</a>
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="stat">
+      <div class="stat-top"><span class="stat-label">Productos</span><span class="stat-icon"><i class="bi bi-tags"></i></span></div>
+      <div class="stat-value" id="k-productos">0</div>
+      <div class="stat-foot">combinaciones prenda · talla · colegio</div>
     </div>
-
-    <table id="tabla-inventario" class="table table-striped" style="width:100%">
-    <thead>
-        <tr>
-            <th>ID</th>
-            <th>Codigo Barras</th>
-            <th>Colegio</th>
-            <th>Uniforme</th>
-            <th>Talla</th>
-            <th>Cantidad</th>
-            <th>Precio Unitario</th>
-            <th>Precio Total</th>
-            <th>Acciones</th>
-        </tr>
-        <tr>
-            <th></th> <!-- ID -->
-            <th></th> <!-- ID -->
-            <th><select class="form-select form-select-sm filter-col" data-column="2"><option value="">Todos</option></select></th>
-            <th><select class="form-select form-select-sm filter-col" data-column="3"><option value="">Todos</option></select></th>
-            <th><select class="form-select form-select-sm filter-col" data-column="4"><option value="">Todos</option></select></th>
-            <th></th> <!-- Cantidad -->
-            <th></th> <!-- Precio Unitario -->
-            <th></th> <!-- Precio Total -->
-            <th></th> <!-- Acciones -->
-        </tr>
-    </thead>
-</table>
-
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat">
+      <div class="stat-top"><span class="stat-label">Unidades en stock</span><span class="stat-icon"><i class="bi bi-boxes"></i></span></div>
+      <div class="stat-value" id="k-unidades">0</div>
+      <div class="stat-foot">prendas disponibles</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat">
+      <div class="stat-top"><span class="stat-label">Valor del inventario</span><span class="stat-icon"><i class="bi bi-cash-stack"></i></span></div>
+      <div class="stat-value" id="k-valor">$0</div>
+      <div class="stat-foot">a precio de venta</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat">
+      <div class="stat-top"><span class="stat-label">Requieren reposición</span><span class="stat-icon" style="background:var(--warning-50);color:var(--warning)"><i class="bi bi-exclamation-triangle"></i></span></div>
+      <div class="stat-value" id="k-bajo">0</div>
+      <div class="stat-foot"><span id="k-agotados">0</span> agotados · menos de 10 unidades</div>
+    </div>
+  </div>
 </div>
 
+<div class="panel">
+  <div class="panel-header flex-wrap">
+    <div class="search-box flex-grow-1" style="max-width:340px">
+      <i class="bi bi-search"></i>
+      <input type="search" id="inv-search" class="form-control" placeholder="Buscar por nombre o código…">
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <select class="form-select filtro" data-column="2" style="width:auto"><option value="">Todos los colegios</option></select>
+      <select class="form-select filtro" data-column="1" style="width:auto"><option value="">Todos los uniformes</option></select>
+      <select class="form-select filtro" data-column="3" style="width:auto"><option value="">Todas las tallas</option></select>
+      <select class="form-select" id="filtro-stock" style="width:auto">
+        <option value="">Todo el stock</option>
+        <option value="bajo">Stock bajo</option>
+        <option value="agotado">Agotados</option>
+        <option value="ok">Con stock</option>
+      </select>
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table id="tabla-inventario" class="table-app" style="width:100%">
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Uniforme</th>
+          <th>Colegio</th>
+          <th>Talla</th>
+          <th class="num">Stock</th>
+          <th class="num">Precio</th>
+          <th class="num">Valor</th>
+          <th class="text-end">Acciones</th>
+        </tr>
+      </thead>
+    </table>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
-    $(document).ready(function() {
-        var table = $('#tabla-inventario').DataTable({
-            ajax: '{% url "inventario_json" %}',
-            language: {
-                url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json'
-            },
-            columns: [
-                { data: 'id' },
-                { data: 'codigo_barras' },
-                { data: 'colegio' },
-                { data: 'uniforme' },
-                { data: 'talla' },
-                { data: 'cantidad' },
-                { 
-                    data: 'precio_unitario',
-                    render: $.fn.dataTable.render.number( ',', '.', 2, '$' )
-                },
-                { 
-                    data: 'precio_total',
-                    render: $.fn.dataTable.render.number( ',', '.', 2, '$' )
-                },
-                { 
-                    data: 'id',
-                    render: function (data, type, row) {
-                        const editarUrl = "{% url 'editar_inventario' 0 %}".replace(0, data);
-                        const eliminarUrl = "{% url 'eliminar_inventario' 0 %}".replace(0, data);
-                        return `
-                            <a href="${editarUrl}" class="btn btn-warning btn-sm">Editar</a>
-                            <a href="${eliminarUrl}" class="btn btn-danger btn-sm">Eliminar</a>
-                        `;
-                    },
-                    orderable: false,
-                    searchable: false
-                }
-            ],
-            initComplete: function () {
-                this.api().columns([1,2,3,4]).every(function () {
-                    var column = this;
-                    var select = $('select[data-column="' + column.index() + '"]');
+const UMBRAL = 10;
 
-                    column.data().unique().sort().each(function (d, j) {
-                        if (d != null && d != '') {
-                            select.append('<option value="'+d+'">'+d+'</option>')
-                        }
-                    });
+function stockBadge(n) {
+  if (n <= 0) return `<span class="badge-soft badge-danger"><i class="bi bi-x-circle"></i>Agotado</span>`;
+  if (n < UMBRAL) return `<span class="badge-soft badge-warn"><i class="bi bi-exclamation-circle"></i>${n}</span>`;
+  return `<span class="badge-soft badge-ok">${n}</span>`;
+}
 
-                    select.on('change', function () {
-                        var val = $.fn.dataTable.util.escapeRegex($(this).val());
-                        column.search(val ? '^'+val+'$' : '', true, false).draw();
-                    });
-                });
-            }
+$(function () {
+  const editUrl = "{% url 'editar_inventario' 0 %}";
+  const delUrl = "{% url 'eliminar_inventario' 0 %}";
+  let filtroStock = '';
+
+  $.fn.dataTable.ext.search.push(function (settings, data, idx, row) {
+    if (settings.nTable.id !== 'tabla-inventario' || !filtroStock) return true;
+    const n = row.cantidad;
+    if (filtroStock === 'agotado') return n <= 0;
+    if (filtroStock === 'bajo') return n > 0 && n < UMBRAL;
+    if (filtroStock === 'ok') return n > 0;
+    return true;
+  });
+
+  const table = $('#tabla-inventario').DataTable({
+    ajax: "{% url 'inventario_json' %}",
+    language: Object.assign({}, App.dtLanguage, { emptyTable: 'Todavía no hay productos. Usa “Agregar producto” para empezar.' }),
+    dom: 'rtip',
+    pageLength: 25,
+    order: [[1, 'asc']],
+    columns: [
+      { data: 'codigo_barras', render: (d, t) => t === 'display'
+          ? (App.codigoValido(d) ? `<span class="code-pill">${App.esc(d)}</span>` : `<span class="badge-soft badge-warn">Sin código</span>`)
+          : d },
+      { data: 'uniforme', render: (d, t) => t === 'display' ? `<span class="cell-strong">${App.esc(d)}</span>` : d },
+      { data: 'colegio', render: (d, t) => t === 'display' ? App.esc(d) : d },
+      { data: 'talla', render: (d, t) => t === 'display' ? `<span class="badge-soft badge-muted">${App.esc(d)}</span>` : d },
+      { data: 'cantidad', className: 'num', render: (d, t) => t === 'display' ? stockBadge(d) : d },
+      { data: 'precio_unitario', className: 'num', render: (d, t) => t === 'display' ? App.money(d) : d },
+      { data: 'precio_total', className: 'num', render: (d, t) => t === 'display' ? `<span class="text-secondary">${App.money(d)}</span>` : d },
+      {
+        data: 'id', orderable: false, searchable: false, className: 'text-end text-nowrap',
+        render: d => `
+          <a href="{% url 'etiquetas' %}?ids=${d}" class="btn-icon" title="Imprimir etiquetas"><i class="bi bi-upc"></i></a>
+          <a href="${editUrl.replace('/0', '/' + d)}" class="btn-icon ms-1" title="Editar"><i class="bi bi-pencil"></i></a>
+          <a href="${delUrl.replace('/0', '/' + d)}" class="btn-icon danger ms-1" title="Eliminar"><i class="bi bi-trash3"></i></a>`
+      }
+    ],
+    initComplete: function () {
+      const api = this.api();
+      const rows = api.rows().data().toArray();
+
+      $('#k-productos').text(App.num(rows.length));
+      $('#k-unidades').text(App.num(rows.reduce((a, r) => a + r.cantidad, 0)));
+      $('#k-valor').text(App.money(rows.reduce((a, r) => a + r.precio_total, 0)));
+      $('#k-bajo').text(App.num(rows.filter(r => r.cantidad < UMBRAL).length));
+      $('#k-agotados').text(App.num(rows.filter(r => r.cantidad <= 0).length));
+
+      $('.filtro').each(function () {
+        const col = api.column($(this).data('column'));
+        const sel = $(this);
+        col.data().unique().sort().each(d => { if (d) sel.append($('<option>').val(d).text(d)); });
+        sel.on('change', function () {
+          const v = $.fn.dataTable.util.escapeRegex(this.value);
+          col.search(v ? '^' + v + '$' : '', true, false).draw();
         });
-        $('.filter-col').on('click', function(e) {
-    e.stopPropagation();
+      });
+
+      const params = new URLSearchParams(location.search);
+      if (params.get('stock')) { $('#filtro-stock').val(params.get('stock')).trigger('change'); }
+    }
+  });
+
+  $('#inv-search').on('input', function () { table.search(this.value).draw(); });
+  $('#filtro-stock').on('change', function () { filtroStock = this.value; table.draw(); });
 });
-
-    });
 </script>
-
 {% endblock %}

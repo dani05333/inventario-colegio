@@ -1,0 +1,56 @@
+<div class="row justify-content-center">
+  <div class="col-xl-8">
+    <div class="panel">
+      <div class="panel-header flex-wrap">
+        <div>
+          <h2 class="panel-title">{{ plural }} <span class="badge-soft badge-muted ms-1" id="cat-count">0</span></h2>
+          <p class="panel-sub">{{ ayuda }}</p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <div class="search-box">
+            <i class="bi bi-search"></i>
+            <input type="search" id="cat-search" class="form-control" placeholder="Buscar {{ singular|lower }}…" style="min-width:220px">
+          </div>
+          <a href="{{ crear_url }}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Agregar {{ singular|lower }}</a>
+        </div>
+      </div>
+      <table id="tabla-cat" class="table-app" style="width:100%">
+        <thead>
+          <tr>
+            <th style="width:70px">#</th>
+            <th>Nombre</th>
+            <th class="text-end" style="width:120px">Acciones</th>
+          </tr>
+        </thead>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const editUrl = "{{ editar_url0 }}";
+  const delUrl = "{{ eliminar_url0 }}";
+  const table = $('#tabla-cat').DataTable({
+    ajax: "{{ json_url }}",
+    language: Object.assign({}, App.dtLanguage, { emptyTable: 'Aún no hay {{ plural|lower }}. Agrega el primero con el botón de arriba.' }),
+    pageLength: 15,
+    order: [[1, 'asc']],
+    dom: 'rtip',
+    columns: [
+      { data: 'id', render: d => `<span class="cell-sub">${d}</span>` },
+      { data: 'nombre', render: (d, t) => t === 'display' ? `<span class="cell-strong">${App.esc(d)}</span>` : d },
+      {
+        data: 'id', orderable: false, searchable: false, className: 'text-end',
+        render: d => `
+          <a href="${editUrl.replace('/0', '/' + d)}" class="btn-icon" title="Editar"><i class="bi bi-pencil"></i></a>
+          <a href="${delUrl.replace('/0', '/' + d)}" class="btn-icon danger ms-1" title="Eliminar"><i class="bi bi-trash3"></i></a>`
+      }
+    ],
+    drawCallback: function () {
+      document.getElementById('cat-count').textContent = this.api().data().count();
+    }
+  });
+  $('#cat-search').on('input', function () { table.search(this.value).draw(); });
+});
+</script>

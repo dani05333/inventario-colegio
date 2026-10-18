@@ -1,22 +1,9 @@
-{% extends 'inicio.html' %}
+{% extends 'base.html' %}
+{% block title %}{% if form.instance.pk %}Editar{% else %}Nuevo{% endif %} colegio{% endblock %}
+{% block page_title %}Colegios{% endblock %}
+{% block page_subtitle %}{% if form.instance.pk %}Editando «{{ form.instance }}»{% else %}Agregar un colegio{% endif %}{% endblock %}
+
 {% block content %}
-
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Agregar Colegio</title>
-</head>
-<body>
-    <h1>Agregar Colegio</h1>
-    
-    <form method="post">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit">{% if form.instance.pk %}Actualizar{% else %}Guardar{% endif %}</button>
-    </form>
-
-    <p><a href="{% url 'ver_colegios' %}">Volver a la lista de colegios</a></p>
-</body>
-</html>
+{% url 'ver_colegios' as volver_url %}
+{% include 'partials/form_simple.html' with singular='Colegio' plural='Colegios' nuevo_txt='Nuevo colegio' %}
 {% endblock %}
