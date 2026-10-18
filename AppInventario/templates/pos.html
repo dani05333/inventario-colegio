@@ -49,33 +49,40 @@
 
   .filtros { display: flex; flex-direction: column; gap: 6px; padding-top: 12px; }
   .filtro-fila { display: flex; align-items: center; gap: 10px; min-width: 0; }
-  .filtro-fila .lbl-f { flex: none; width: 58px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .filtro-fila .lbl-f { flex: none; width: 62px; font-size: 11.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text-2); }
   .filtro-fila .chips { padding: 0 0 2px; flex: 1; min-width: 0; }
-  .chip.sm { padding: 4px 11px; font-size: 12.5px; }
+  .chip.sm { padding: 5px 12px; font-size: 13.5px; color: var(--text); border-color: var(--border-strong); }
+  .chip.sm.active { background: var(--text); border-color: var(--text); color: #fff; }
+  .chip.sm .pt { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--c-fg); margin-right: 6px; vertical-align: 0; }
+  .chip.sm.col.active { background: var(--c-fg); border-color: var(--c-fg); color: #fff; }
+  .chip.sm.col.active .pt { background: #fff; }
+  /* Etiqueta de colegio: cada colegio con su color (fondo suave + texto oscuro del mismo tono) */
+  .tag-colegio { display: inline-block; align-self: flex-start; max-width: 100%; padding: 2px 9px; border-radius: 7px;
+    background: var(--c-bg); color: var(--c-fg); font-size: 13px; font-weight: 700; line-height: 1.45;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 14px; }
   .product-card {
     position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
     padding: 13px 14px; display: flex; flex-direction: column; gap: 4px;
   }
-  .product-card .p-name { font-weight: 650; line-height: 1.25; padding-right: 26px; }
-  .product-card .p-school { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .product-card .p-name { font-weight: 700; font-size: 16px; color: var(--text); line-height: 1.25; padding-right: 26px; }
   .product-card .p-foot { margin-top: 6px; display: flex; align-items: end; justify-content: space-between; gap: 6px; }
-  .product-card .p-price { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .product-card .p-stock { font-size: 12px; color: var(--muted); }
+  .product-card .p-price { font-size: 17px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+  .product-card .p-stock { font-size: 13px; font-weight: 600; color: var(--text-2); }
   .product-card .p-incart {
     position: absolute; top: 10px; right: 10px; min-width: 22px; height: 22px; border-radius: 999px;
     background: var(--primary); color: #fff; font-size: 12px; font-weight: 700; display: grid; place-items: center; padding: 0 6px;
   }
   .sizes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   .size {
-    position: relative; min-width: 42px; height: 38px; padding: 0 10px; border-radius: 10px;
-    border: 1.5px solid var(--border-strong); background: var(--surface); color: var(--text);
-    font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; transition: border-color .1s, background .1s, transform .06s;
+    position: relative; min-width: 46px; height: 42px; padding: 0 10px; border-radius: 10px;
+    border: 2px solid #b9bdca; background: var(--surface); color: var(--text);
+    font-weight: 800; font-size: 16px; font-variant-numeric: tabular-nums; transition: border-color .1s, background .1s, transform .06s;
   }
   .size:hover { border-color: var(--primary); background: var(--primary-50); }
   .size:active { transform: scale(.95); }
-  .size.low { border-color: #f0c27b; }
+  .size.low { border-color: #e09a2c; }
   .size.match { border-color: var(--primary); background: var(--primary-50); color: var(--primary); box-shadow: 0 0 0 2px var(--primary-100); }
   .size.out { color: var(--muted); background: var(--surface-2); border-style: dashed; cursor: not-allowed; text-decoration: line-through; }
   .size .dot {
@@ -91,7 +98,7 @@
   @media (max-width: 991.98px) { .ticket { position: static; height: auto; min-height: 0; } }
   .ticket-items { flex: 1; overflow-y: auto; }
   .ticket-item { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; padding: 12px 18px; border-bottom: 1px solid var(--border); }
-  .ticket-item .t-name { font-weight: 600; line-height: 1.25; }
+  .ticket-item .t-name { font-weight: 700; font-size: 15px; line-height: 1.25; }
   .ticket-item .t-sub { font-size: 12.5px; color: var(--muted); }
   .ticket-item .t-total { font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
   .ticket-item .t-row { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; }
@@ -144,7 +151,7 @@
     .filtros { padding-top: 8px; gap: 4px; }
     .product-grid { gap: 10px; margin-top: 10px; }
     .product-card { padding: 11px 12px; }
-    .size { height: 34px; min-width: 38px; }
+    .size { height: 38px; min-width: 42px; }
     .ticket { top: calc(var(--topbar-h) + 18px); height: calc(100vh - var(--topbar-h) - 36px); min-height: 400px; }
     .ticket .panel-header { padding: 12px 16px; }
     .ticket-item { padding: 10px 16px; }
@@ -189,6 +196,7 @@
     <div class="filtros">
       <div class="filtro-fila d-none" id="fila-colegio"><span class="lbl-f">Colegio</span><div class="chips" id="chips-colegio"></div></div>
       <div class="filtro-fila d-none" id="fila-prenda"><span class="lbl-f">Prenda</span><div class="chips" id="chips-prenda"></div></div>
+      <div class="filtro-fila d-none" id="fila-color"><span class="lbl-f">Color</span><div class="chips" id="chips-color"></div></div>
       <div class="filtro-fila d-none" id="fila-talla"><span class="lbl-f">Talla</span><div class="chips" id="chips-talla"></div></div>
     </div>
     <div class="product-grid" id="grid"></div>
@@ -382,13 +390,23 @@ function compararTallas(a, b) {
 let familias = [];
 let tallasConocidas = new Set();
 let prendaActiva = '';
+let colorActivo = '';
 let tallaActiva = '';
+
+/* Un color por colegio (siempre el mismo para cada colegio, según su orden de creación) */
+const PALETA_COLEGIOS = [
+  ['#e2eefc', '#1d5aa6'], ['#dcf3ea', '#0e6b4b'], ['#fde8dc', '#a2421a'], ['#efe9fb', '#5a3fb8'],
+  ['#fbe3ec', '#9e2f5a'], ['#fbf0d5', '#865a00'], ['#dff0df', '#1c6a1c'], ['#fbe1e1', '#a32a2a'],
+];
+let colorColegio = {};
+const estiloColegio = nombre => { const c = colorColegio[nombre] || ['#eef0f4', '#3b4150']; return `--c-bg:${c[0]};--c-fg:${c[1]}`; };
+const tagColegio = nombre => `<span class="tag-colegio" style="${estiloColegio(nombre)}">${App.esc(nombre)}</span>`;
 
 function armarFamilias() {
   const mapa = new Map();
   productos.forEach(p => {
     const k = `${p.uniforme_id}|${p.color}|${p.colegio_id}`;
-    if (!mapa.has(k)) mapa.set(k, { key: k, nombre: p.nombre, uniforme: p.uniforme, colegio: p.colegio, variantes: [] });
+    if (!mapa.has(k)) mapa.set(k, { key: k, nombre: p.nombre, uniforme: p.uniforme, color: p.color, colegio: p.colegio, variantes: [] });
     mapa.get(k).variantes.push(p);
   });
   familias = [...mapa.values()];
@@ -399,6 +417,8 @@ function armarFamilias() {
   });
   familias.sort((a, b) => a.colegio.localeCompare(b.colegio) || a.nombre.localeCompare(b.nombre));
   tallasConocidas = new Set(productos.map(p => sinTildes(p.talla)));
+  const ids = [...new Map(productos.map(p => [p.colegio_id, p.colegio])).entries()].sort((a, b) => a[0] - b[0]);
+  colorColegio = Object.fromEntries(ids.map(([, nombre], i) => [nombre, PALETA_COLEGIOS[i % PALETA_COLEGIOS.length]]));
 }
 
 /* Devuelve [{familia, coinciden: Set(ids de las tallas que calzan con la talla pedida), tallaPedida}] */
@@ -412,6 +432,7 @@ function filtrar() {
   for (const f of familias) {
     if (colegioActivo && f.colegio !== colegioActivo) continue;
     if (prendaActiva && f.uniforme !== prendaActiva) continue;
+    if (colorActivo && f.color !== colorActivo) continue;
     if (!palabras.every(t => coincide(t, f, estrictas.has(t)))) continue;
     const coinciden = new Set();
     if (tallasPedidas.length) {
@@ -434,14 +455,20 @@ function renderChips() {
   const prendas = [...new Set(delColegio.map(p => p.uniforme))].sort((a, b) => a.localeCompare(b));
   if (prendaActiva && !prendas.includes(prendaActiva)) prendaActiva = '';
   const deLaPrenda = delColegio.filter(p => !prendaActiva || p.uniforme === prendaActiva);
-  const tallas = [...new Set(deLaPrenda.map(p => p.talla))].sort(compararTallas);
+  const colores = [...new Set(deLaPrenda.map(p => p.color).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  if (colorActivo && !colores.includes(colorActivo)) colorActivo = '';
+  const delColor = deLaPrenda.filter(p => !colorActivo || p.color === colorActivo);
+  const tallas = [...new Set(delColor.map(p => p.talla))].sort(compararTallas);
   if (tallaActiva && !tallas.includes(tallaActiva)) tallaActiva = '';
 
-  $('#chips-colegio').html(chipsHtml(colegios, colegioActivo, 'colegio'));
+  $('#chips-colegio').html([`<button class="chip sm ${colegioActivo ? '' : 'active'}" data-colegio="">Todos</button>`]
+    .concat(colegios.map(c => `<button class="chip sm col ${c === colegioActivo ? 'active' : ''}" style="${estiloColegio(c)}" data-colegio="${App.esc(c)}"><span class="pt"></span>${App.esc(c)}</button>`)).join(''));
   $('#chips-prenda').html(chipsHtml(prendas, prendaActiva, 'prenda'));
+  $('#chips-color').html(chipsHtml(colores, colorActivo, 'color'));
   $('#chips-talla').html(chipsHtml(tallas, tallaActiva, 'talla'));
   $('#fila-colegio').toggleClass('d-none', colegios.length < 2);
   $('#fila-prenda').toggleClass('d-none', prendas.length < 2);
+  $('#fila-color').toggleClass('d-none', colores.length < 1);
   $('#fila-talla').toggleClass('d-none', tallas.length < 2);
 }
 
@@ -463,7 +490,7 @@ function renderGrid() {
       <div class="product-card">
         ${enVenta ? `<span class="p-incart">${enVenta}</span>` : ''}
         <span class="p-name">${App.esc(f.nombre)}</span>
-        <span class="p-school">${App.esc(f.colegio)}</span>
+        ${tagColegio(f.colegio)}
         <div class="sizes">${botones}</div>
         <span class="p-foot">
           <span class="p-price">${min === max ? App.money(min) : App.money(min) + ' – ' + App.money(max)}</span>
@@ -556,7 +583,7 @@ function renderTicket(flashId) {
       <div class="ticket-item ${c.id === flashId ? 'ticket-flash' : ''}" data-id="${c.id}">
         <div>
           <div class="t-name">${App.esc(c.nombre)} <span class="badge-soft badge-muted ms-1">${App.esc(c.talla)}</span></div>
-          <div class="t-sub">${App.esc(c.colegio)}</div>
+          <div class="mt-1">${tagColegio(c.colegio)}</div>
         </div>
         <div class="t-total">${App.money(c.precio * c.cantidad)}</div>
         <div class="t-row">
@@ -622,8 +649,9 @@ $buscador.on('keydown', function (e) {
   }
 });
 
-$('#chips-colegio').on('click', '.chip', function () { colegioActivo = String($(this).data('colegio')); prendaActiva = ''; tallaActiva = ''; renderChips(); renderGrid(); $buscador.focus(); });
-$('#chips-prenda').on('click', '.chip', function () { prendaActiva = String($(this).data('prenda')); tallaActiva = ''; renderChips(); renderGrid(); $buscador.focus(); });
+$('#chips-colegio').on('click', '.chip', function () { colegioActivo = String($(this).data('colegio')); prendaActiva = ''; colorActivo = ''; tallaActiva = ''; renderChips(); renderGrid(); $buscador.focus(); });
+$('#chips-prenda').on('click', '.chip', function () { prendaActiva = String($(this).data('prenda')); colorActivo = ''; tallaActiva = ''; renderChips(); renderGrid(); $buscador.focus(); });
+$('#chips-color').on('click', '.chip', function () { colorActivo = String($(this).data('color')); tallaActiva = ''; renderChips(); renderGrid(); $buscador.focus(); });
 $('#chips-talla').on('click', '.chip', function () { tallaActiva = String($(this).data('talla')); renderChips(); renderGrid(); $buscador.focus(); });
 
 $('#grid').on('click', '.size:not(:disabled)', function () {
@@ -632,7 +660,7 @@ $('#grid').on('click', '.size:not(:disabled)', function () {
 });
 
 // Al terminar una venta los filtros vuelven a "Todos" (durante la venta el colegio elegido se mantiene)
-function reiniciarFiltros() { colegioActivo = ''; prendaActiva = ''; tallaActiva = ''; renderChips(); }
+function reiniciarFiltros() { colegioActivo = ''; prendaActiva = ''; colorActivo = ''; tallaActiva = ''; renderChips(); }
 
 // Si se crean productos o conjuntos mientras el POS está abierto, se cargan al volver a esta ventana
 let ultimaCarga = 0;
