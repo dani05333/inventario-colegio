@@ -16,7 +16,7 @@ from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_GET, require_POST
 from django.views.generic.edit import CreateView, DeleteView, UpdateView
 
-from . import sistema
+from . import seguridad, sistema
 from .models import Colegio, DetalleVenta, Inventario, Talla, Uniforme, Venta
 
 logger = logging.getLogger(__name__)
@@ -66,6 +66,10 @@ class EliminarProtegidoMixin:
         return ctx
 
     def form_valid(self, form):
+        try:
+            seguridad.verificar(self.request.POST.get('clave'))
+        except seguridad.ClaveError as e:
+            return self.render_to_response(self.get_context_data(form=form, error_clave=str(e)))
         try:
             return super().form_valid(form)
         except ProtectedError:
@@ -400,6 +404,10 @@ def anular_venta(request, pk):
     devolver_stock = bool(datos.get('devolver_stock', True))
     if not motivo:
         return _error('Indica el motivo de la anulación.')
+    try:
+        seguridad.verificar(datos.get('clave'))
+    except seguridad.ClaveError as e:
+        return _error(str(e))
 
     with transaction.atomic():
         venta = get_object_or_404(Venta.objects.select_for_update(), pk=pk)
@@ -444,6 +452,22 @@ def ver_sistema(request):
 
 
 @require_POST
+def sistema_clave(request):
+    """Crea o cambia la clave de administrador."""
+    try:
+        datos = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        datos = {}
+    if datos.get('nueva') != datos.get('repetir'):
+        return _error('La clave nueva y su repetición no coinciden.')
+    try:
+        seguridad.cambiar(datos.get('nueva'), actual=datos.get('actual'))
+    except seguridad.ClaveError as e:
+        return _error(str(e))
+    return JsonResponse({'status': 'success'})
+
+
+@require_POST
 def borrar_ventas(request):
     """Elimina TODAS las ventas (pensado para limpiar las ventas de prueba antes de empezar a operar).
     Hace un respaldo antes y exige escribir BORRAR para confirmar."""
@@ -453,6 +477,10 @@ def borrar_ventas(request):
         datos = {}
     if datos.get('confirmacion') != 'BORRAR':
         return _error('Para confirmar debes escribir BORRAR.')
+    try:
+        seguridad.verificar(datos.get('clave'))
+    except seguridad.ClaveError as e:
+        return _error(str(e))
     devolver_stock = bool(datos.get('devolver_stock', True))
 
     respaldo = None

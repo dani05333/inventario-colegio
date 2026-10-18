@@ -111,11 +111,20 @@
           <label class="form-check-label" for="an-stock">Devolver los productos al inventario</label>
           <div class="field-help">Desmárcalo si los productos no vuelven a la tienda (por ejemplo, si se entregaron dañados).</div>
         </div>
+        {% if TIENE_CLAVE %}
+        <label class="form-label mt-3" for="an-clave"><i class="bi bi-shield-lock me-1"></i>Clave de administrador</label>
+        <input type="password" class="form-control" id="an-clave" autocomplete="off" inputmode="numeric">
+        {% else %}
+        <div class="mt-3 p-3 rounded-3 small" style="background:var(--warning-50);color:var(--warning)">
+          <i class="bi bi-shield-lock me-1"></i>Para anular ventas se necesita una clave de administrador, y aún no se ha creado.
+          <a href="{% url 'sistema' %}#clave">Crearla en Sistema</a>.
+        </div>
+        {% endif %}
         <div class="field-help mt-3"><i class="bi bi-info-circle me-1"></i>La boleta queda en el historial marcada como anulada y deja de contar en los totales y en el análisis. Esta acción no se puede deshacer.</div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-light-border" data-bs-dismiss="modal">Cancelar</button>
-        <button type="button" class="btn btn-danger" id="an-confirmar"><i class="bi bi-x-octagon me-1"></i>Anular venta</button>
+        <button type="button" class="btn btn-danger" id="an-confirmar" {% if not TIENE_CLAVE %}disabled{% endif %}><i class="bi bi-x-octagon me-1"></i>Anular venta</button>
       </div>
     </div>
   </div>
@@ -248,8 +257,12 @@ $(function () {
     $('#an-motivo').val('Venta de prueba');
     $('#an-otro').val('').addClass('d-none');
     $('#an-stock').prop('checked', true);
+    $('#an-clave').val('');
     modalAnular.show();
   });
+
+  $('#modalAnular').on('shown.bs.modal', () => $('#an-clave').focus());
+  $('#an-clave').on('keydown', e => { if (e.key === 'Enter') $('#an-confirmar').click(); });
 
   $('#an-motivo').on('change', function () {
     $('#an-otro').toggleClass('d-none', this.value !== 'otro');
@@ -267,7 +280,7 @@ $(function () {
       method: 'POST',
       contentType: 'application/json',
       headers: { 'X-CSRFToken': '{{ csrf_token }}' },
-      data: JSON.stringify({ motivo, devolver_stock: $('#an-stock').prop('checked') })
+      data: JSON.stringify({ motivo, devolver_stock: $('#an-stock').prop('checked'), clave: $('#an-clave').val() })
     }).done(res => {
       const nodo = $(filaAnular.node());
       if (filaAnular.child.isShown()) { filaAnular.child.hide(); nodo.removeClass('shown'); }
@@ -276,6 +289,7 @@ $(function () {
       App.toast(`Boleta N° ${v.id} anulada${$('#an-stock').prop('checked') ? ' y productos devueltos al inventario' : ''}`, 'success', 4500);
     }).fail(xhr => {
       App.toast((xhr.responseJSON && xhr.responseJSON.message) || 'No se pudo anular la venta', 'error', 5000);
+      $('#an-clave').val('').focus();
     }).always(() => btn.prop('disabled', false));
   });
 

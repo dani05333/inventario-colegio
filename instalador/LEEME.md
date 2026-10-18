@@ -61,6 +61,17 @@ En el POS, la próxima vez que abran el programa aparece un aviso, y en **Sistem
 
 Desinstalar el programa **no borra** la base de datos ni los respaldos.
 
+## Si se olvida la clave de administrador
+
+En el POS, presiona **Windows + R**, pega esto y presiona Enter:
+
+```
+"%LOCALAPPDATA%\Programs\Chloe POS\python\pythonw.exe" "%LOCALAPPDATA%\Programs\Chloe POS\lanzador.py" --restablecer-clave
+```
+
+Confirma con **Sí**. Luego abre Chloe POS y crea una clave nueva en **Sistema → Clave de administrador**.
+(No hay botón visible a propósito: así solo lo puede hacer quien conoce este paso.)
+
 ## Restaurar un respaldo
 
 1. Cierra la ventana de Chloe POS y, en el menú Inicio, ejecuta **Chloe POS → Detener Chloe POS**.

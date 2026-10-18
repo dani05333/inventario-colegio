@@ -12,6 +12,7 @@ Si el servidor ya está corriendo, solo abre la ventana.
 Opciones:
   --servidor   solo levanta el servidor, sin abrir ventana (lo usa el instalador al actualizar)
   --respaldar  crea un respaldo de la base de datos y avisa dónde quedó
+  --restablecer-clave  borra la clave de administrador (si se olvidó)
   --detener    detiene el servidor si está corriendo
 """
 import ctypes
@@ -162,6 +163,22 @@ def main():
 
     if '--detener' in args:
         detener()
+        return
+
+    if '--restablecer-clave' in args:
+        # Para cuando se olvida la clave de administrador: la borra y se crea una nueva en Sistema
+        if ctypes.windll.user32.MessageBoxW(
+                None, '¿Borrar la clave de administrador de Chloe POS?\n\n'
+                      'Después tendrás que crear una nueva en Sistema → Clave de administrador.',
+                NOMBRE, 0x04 | 0x30) != 6:   # Sí/No + advertencia; 6 = Sí
+            return
+        import django
+        django.setup()
+        from django.core.management import call_command
+        call_command('migrate', interactive=False, verbosity=0)
+        from AppInventario.seguridad import restablecer
+        restablecer()
+        mensaje('La clave de administrador fue borrada.\n\nAbre Chloe POS y crea una nueva en Sistema.')
         return
 
     if '--respaldar' in args:

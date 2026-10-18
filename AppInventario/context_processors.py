@@ -1,9 +1,12 @@
 from django.conf import settings
 
+from . import seguridad
+
 
 def sistema(request):
-    """Versión y modo (instalado o desarrollo) disponibles en todas las plantillas."""
+    """Versión, modo (instalado o desarrollo) y si existe clave de administrador, para todas las plantillas."""
     return {
         'APP_VERSION': settings.APP_VERSION,
         'INSTALADO': settings.INSTALADO,
+        'TIENE_CLAVE': seguridad.tiene_clave,   # se evalúa solo si la plantilla lo usa
     }

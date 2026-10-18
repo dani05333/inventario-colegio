@@ -75,6 +75,43 @@
   </div>
 </div>
 
+<!-- Clave de administrador -->
+<div class="panel mt-4" style="max-width:1100px" id="clave">
+  <div class="panel-header">
+    <div>
+      <h2 class="panel-title"><i class="bi bi-shield-lock me-1"></i>Clave de administrador</h2>
+      <p class="panel-sub">Se pide para anular ventas, borrar ventas y eliminar productos o catálogos</p>
+    </div>
+    {% if TIENE_CLAVE %}
+      <span class="badge-soft badge-ok"><i class="bi bi-check-circle"></i>Configurada</span>
+    {% else %}
+      <span class="badge-soft badge-warn"><i class="bi bi-exclamation-circle"></i>Sin configurar</span>
+    {% endif %}
+  </div>
+  <div class="panel-body">
+    {% if not TIENE_CLAVE %}
+    <p class="mb-3">Crea una clave para poder anular o borrar. Compártela solo con quien administre el local.</p>
+    {% endif %}
+    <div class="row g-3 align-items-end" style="max-width:820px">
+      {% if TIENE_CLAVE %}
+      <div class="col-sm-4">
+        <label class="form-label" for="cl-actual">Clave actual</label>
+        <input type="password" class="form-control" id="cl-actual" autocomplete="off">
+      </div>
+      {% endif %}
+      <div class="col-sm-4">
+        <label class="form-label" for="cl-nueva">{% if TIENE_CLAVE %}Clave nueva{% else %}Clave{% endif %} <span class="fw-normal text-secondary">(mín. 4)</span></label>
+        <input type="password" class="form-control" id="cl-nueva" autocomplete="new-password">
+      </div>
+      <div class="col-sm-4">
+        <label class="form-label" for="cl-repetir">Repetir</label>
+        <input type="password" class="form-control" id="cl-repetir" autocomplete="new-password">
+      </div>
+    </div>
+    <button class="btn btn-primary mt-3" id="btn-clave"><i class="bi bi-key me-1"></i>{% if TIENE_CLAVE %}Cambiar clave{% else %}Crear clave{% endif %}</button>
+  </div>
+</div>
+
 <!-- Borrar ventas de prueba -->
 <div class="panel mt-4" style="max-width:1100px;border-color:#f3c7c7">
   <div class="panel-header">
@@ -94,9 +131,15 @@
       <label class="form-check-label" for="bv-stock">Devolver al inventario las unidades vendidas</label>
       <div class="field-help">Recomendado si las ventas eran de práctica: así el stock vuelve a quedar como estaba.</div>
     </div>
-    <label class="form-label" for="bv-confirmar">Para confirmar, escribe <strong>BORRAR</strong></label>
+    {% if not TIENE_CLAVE %}
+    <div class="p-3 mb-3 rounded-3 small" style="background:var(--warning-50);color:var(--warning)">
+      <i class="bi bi-shield-lock me-1"></i>Primero crea la clave de administrador (más arriba).
+    </div>
+    {% endif %}
+    <label class="form-label" for="bv-confirmar">Para confirmar, escribe <strong>BORRAR</strong> y la clave de administrador</label>
     <div class="d-flex gap-2 flex-wrap">
-      <input type="text" class="form-control" id="bv-confirmar" autocomplete="off" style="max-width:220px" placeholder="BORRAR">
+      <input type="text" class="form-control" id="bv-confirmar" autocomplete="off" style="max-width:200px" placeholder="BORRAR">
+      <input type="password" class="form-control" id="bv-clave" autocomplete="off" style="max-width:200px" placeholder="Clave" {% if not TIENE_CLAVE %}disabled{% endif %}>
       <button class="btn btn-danger" id="btn-borrar-ventas" disabled {% if not total_ventas %}title="No hay ventas"{% endif %}>
         <i class="bi bi-trash3 me-1"></i>Borrar todas las ventas
       </button>
@@ -190,8 +233,9 @@ $('#btn-respaldar').on('click', function () {
 
 /* ---------- Borrar ventas de prueba ---------- */
 const HAY_VENTAS = {{ total_ventas|default:0 }} > 0;
-$('#bv-confirmar').on('input', function () {
-  $('#btn-borrar-ventas').prop('disabled', !(HAY_VENTAS && this.value.trim() === 'BORRAR'));
+const TIENE_CLAVE = {% if TIENE_CLAVE %}true{% else %}false{% endif %};
+$('#bv-confirmar, #bv-clave').on('input', function () {
+  $('#btn-borrar-ventas').prop('disabled', !(HAY_VENTAS && TIENE_CLAVE && $('#bv-confirmar').val().trim() === 'BORRAR' && $('#bv-clave').val()));
 });
 $('#btn-borrar-ventas').on('click', function () {
   if (!confirm('Se eliminarán TODAS las ventas del historial. ¿Continuar?')) return;
@@ -199,13 +243,30 @@ $('#btn-borrar-ventas').on('click', function () {
   $.ajax({
     url: "{% url 'borrar_ventas' %}", method: 'POST', contentType: 'application/json',
     headers: { 'X-CSRFToken': CSRF },
-    data: JSON.stringify({ confirmacion: $('#bv-confirmar').val().trim(), devolver_stock: $('#bv-stock').prop('checked') })
+    data: JSON.stringify({ confirmacion: $('#bv-confirmar').val().trim(), devolver_stock: $('#bv-stock').prop('checked'), clave: $('#bv-clave').val() })
   }).done(r => {
     App.toast(`Se borraron ${r.borradas} venta${r.borradas === 1 ? '' : 's'}${r.respaldo ? '. Respaldo previo: ' + r.respaldo : ''}`, 'success', 6000);
     setTimeout(() => location.reload(), 1500);
   }).fail(xhr => {
     App.toast((xhr.responseJSON && xhr.responseJSON.message) || 'No se pudieron borrar las ventas', 'error', 6000);
     btn.prop('disabled', false).html('<i class="bi bi-trash3 me-1"></i>Borrar todas las ventas');
+    $('#bv-clave').val('');
+  });
+});
+
+/* ---------- Clave de administrador ---------- */
+$('#btn-clave').on('click', function () {
+  const btn = $(this).prop('disabled', true);
+  $.ajax({
+    url: "{% url 'sistema_clave' %}", method: 'POST', contentType: 'application/json',
+    headers: { 'X-CSRFToken': CSRF },
+    data: JSON.stringify({ actual: $('#cl-actual').val(), nueva: $('#cl-nueva').val(), repetir: $('#cl-repetir').val() })
+  }).done(() => {
+    App.toast(TIENE_CLAVE ? 'Clave cambiada' : 'Clave creada. Guárdala en un lugar seguro.', 'success', 5000);
+    setTimeout(() => { location.hash = 'clave'; location.reload(); }, 1200);
+  }).fail(xhr => {
+    App.toast((xhr.responseJSON && xhr.responseJSON.message) || 'No se pudo guardar la clave', 'error', 5000);
+    btn.prop('disabled', false);
   });
 });
 

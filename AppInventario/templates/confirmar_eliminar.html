@@ -32,9 +32,21 @@
     </div>
     <form method="post">
       {% csrf_token %}
+      {% if TIENE_CLAVE %}
+      <div class="px-4 pb-3">
+        <label class="form-label" for="clave"><i class="bi bi-shield-lock me-1"></i>Clave de administrador</label>
+        <input type="password" name="clave" id="clave" class="form-control" autocomplete="off" inputmode="numeric" required autofocus>
+        {% if error_clave %}<div class="field-error">{{ error_clave }}</div>{% endif %}
+      </div>
+      {% else %}
+      <div class="mx-4 mb-3 p-3 rounded-3 small" style="background:var(--warning-50);color:var(--warning)">
+        <i class="bi bi-shield-lock me-1"></i>Para eliminar se necesita una clave de administrador, y aún no se ha creado.
+        <a href="{% url 'sistema' %}#clave">Crearla en Sistema</a>.
+      </div>
+      {% endif %}
       <div class="modal-footer justify-content-between">
         <a href="{{ volver_url }}" class="btn btn-light-border">Cancelar</a>
-        <button type="submit" class="btn btn-danger"><i class="bi bi-trash3 me-1"></i>Sí, eliminar</button>
+        <button type="submit" class="btn btn-danger" {% if not TIENE_CLAVE %}disabled{% endif %}><i class="bi bi-trash3 me-1"></i>Sí, eliminar</button>
       </div>
     </form>
     {% endif %}

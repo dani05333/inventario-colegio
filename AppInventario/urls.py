@@ -36,6 +36,7 @@ urlpatterns = [
     path('boleta/<int:pk>/', views.boleta, name='boleta'),
     path('api/ventas/<int:pk>/anular/', views.anular_venta, name='anular_venta'),
     path('api/sistema/borrar-ventas/', views.borrar_ventas, name='borrar_ventas'),
+    path('api/sistema/clave/', views.sistema_clave, name='sistema_clave'),
     path('etiquetas/', views.etiquetas, name='etiquetas'),
     path('sistema/', views.ver_sistema, name='sistema'),
     path('api/sistema/salud/', views.sistema_salud, name='sistema_salud'),

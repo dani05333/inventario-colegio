@@ -56,6 +56,15 @@ class Venta(models.Model):
     fecha_anulacion = models.DateTimeField(null=True, blank=True)
     motivo_anulacion = models.CharField(max_length=200, blank=True)
 
+class Configuracion(models.Model):
+    """Ajustes del sistema como pares clave/valor (por ejemplo, la clave de administrador cifrada)."""
+    clave = models.CharField(max_length=50, unique=True)
+    valor = models.TextField(blank=True)
+
+    def __str__(self):
+        return self.clave
+
+
 class DetalleVenta(models.Model):
     venta = models.ForeignKey(Venta, on_delete=models.CASCADE)
     # PROTECT: un producto con ventas no se puede borrar, así el historial queda completo
