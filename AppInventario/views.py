@@ -370,6 +370,9 @@ def _venta_dict(venta):
         'items': items,
         'metodo_pago': venta.metodo_pago,
         'metodo_pago_nombre': venta.get_metodo_pago_display(),
+        'anulada': venta.anulada,
+        'fecha_anulacion': venta.fecha_anulacion.isoformat() if venta.fecha_anulacion else None,
+        'motivo_anulacion': venta.motivo_anulacion,
     }
 
 
@@ -384,6 +387,34 @@ def _ventas_con_detalle():
 def historial_ventas(request):
     ventas = _ventas_con_detalle().order_by('-fecha')
     return render(request, 'historial_ventas.html', {'ventas_data': [_venta_dict(v) for v in ventas]})
+
+
+@require_POST
+def anular_venta(request, pk):
+    """Anula una venta: deja de contar en totales y análisis, y opcionalmente devuelve el stock."""
+    try:
+        datos = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        datos = {}
+    motivo = str(datos.get('motivo') or '').strip()[:200]
+    devolver_stock = bool(datos.get('devolver_stock', True))
+    if not motivo:
+        return _error('Indica el motivo de la anulación.')
+
+    with transaction.atomic():
+        venta = get_object_or_404(Venta.objects.select_for_update(), pk=pk)
+        if venta.anulada:
+            return _error('Esta venta ya estaba anulada.')
+        if devolver_stock:
+            for detalle in venta.detalleventa_set.select_related('inventario'):
+                Inventario.objects.filter(pk=detalle.inventario_id).update(cantidad=F('cantidad') + detalle.cantidad)
+        venta.anulada = True
+        venta.fecha_anulacion = timezone.now()
+        venta.motivo_anulacion = motivo
+        venta.save(update_fields=['anulada', 'fecha_anulacion', 'motivo_anulacion'])
+
+    venta = _ventas_con_detalle().get(pk=pk)
+    return JsonResponse({'status': 'success', 'venta': _venta_dict(venta)})
 
 
 def boleta(request, pk):
@@ -407,7 +438,43 @@ def ver_sistema(request):
         'respaldos': sistema.listar_respaldos(),
         'respaldos_dir': settings.RESPALDOS_DIR,
         'datos_dir': settings.DATA_DIR,
+        'total_ventas': Venta.objects.count(),
+        'ventas_anuladas': Venta.objects.filter(anulada=True).count(),
     })
+
+
+@require_POST
+def borrar_ventas(request):
+    """Elimina TODAS las ventas (pensado para limpiar las ventas de prueba antes de empezar a operar).
+    Hace un respaldo antes y exige escribir BORRAR para confirmar."""
+    try:
+        datos = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        datos = {}
+    if datos.get('confirmacion') != 'BORRAR':
+        return _error('Para confirmar debes escribir BORRAR.')
+    devolver_stock = bool(datos.get('devolver_stock', True))
+
+    respaldo = None
+    if settings.DATABASES['default']['ENGINE'].endswith('sqlite3'):
+        try:
+            respaldo = sistema.crear_respaldo('antes-de-borrar-ventas')
+        except Exception:
+            logger.exception('No se pudo respaldar antes de borrar ventas')
+            return _error('No se pudo crear el respaldo previo, así que no se borró nada.')
+
+    with transaction.atomic():
+        if devolver_stock:
+            # Las anuladas ya devolvieron su stock al anularse (o se decidió no devolverlo)
+            vendidas = (DetalleVenta.objects.filter(venta__anulada=False)
+                        .values('inventario_id').annotate(total=Sum('cantidad')))
+            for fila in vendidas:
+                Inventario.objects.filter(pk=fila['inventario_id']).update(cantidad=F('cantidad') + fila['total'])
+        borradas = Venta.objects.count()
+        DetalleVenta.objects.all().delete()
+        Venta.objects.all().delete()
+
+    return JsonResponse({'status': 'success', 'borradas': borradas, 'respaldo': respaldo.name if respaldo else None})
 
 
 @require_GET
@@ -464,8 +531,9 @@ def ventas_data(request):
     fecha_inicio = parse_date(request.GET.get('inicio') or '')
     fecha_fin = parse_date(request.GET.get('fin') or '')
 
-    ventas_qs = Venta.objects.all()
-    detalles = DetalleVenta.objects.all()
+    # Las ventas anuladas no cuentan en el análisis
+    ventas_qs = Venta.objects.filter(anulada=False)
+    detalles = DetalleVenta.objects.filter(venta__anulada=False)
 
     if fecha_inicio and fecha_fin:
         desde = _inicio_del_dia(fecha_inicio)
@@ -531,7 +599,7 @@ def historial_ventas_json(request):
 
     detalles = DetalleVenta.objects.select_related(
         'venta', 'inventario__uniforme', 'inventario__talla', 'inventario__colegio'
-    ).all()
+    ).filter(venta__anulada=False)
 
     # Filtrado simple por búsqueda (producto, talla, colegio)
     if search_value:
@@ -592,7 +660,7 @@ def productos_tendencia(request):
 
     def vendidos(desde, hasta):
         return DetalleVenta.objects.filter(
-            venta__fecha__gte=desde, venta__fecha__lt=hasta
+            venta__anulada=False, venta__fecha__gte=desde, venta__fecha__lt=hasta
         ).values(
             nombre=F('inventario__uniforme__nombre'),
             talla=F('inventario__talla__nombre'),

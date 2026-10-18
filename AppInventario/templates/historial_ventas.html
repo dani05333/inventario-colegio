@@ -16,6 +16,17 @@
   tr.shown td { background: var(--surface-2) !important; }
   .btn-expand i { transition: transform .15s; }
   tr.shown .btn-expand i { transform: rotate(90deg); }
+  /* Ventas anuladas: visibles pero apagadas, y sin contar en los totales */
+  tr.anulada td { color: var(--muted); }
+  tr.anulada td .cell-strong, tr.anulada td strong { color: var(--muted); }
+  tr.anulada .monto { text-decoration: line-through; }
+  .nota-anulada { background: var(--danger-50); color: var(--danger); border-radius: 10px; padding: 10px 12px; margin: 8px 0 6px; font-size: 13px; }
+  .form-check-input:checked { background-color: var(--primary); border-color: var(--primary); }
+  /* Pantallas medianas (1024 px): se oculta Unidades (sigue en el detalle) para que la tabla quepa */
+  @media (max-width: 1199.98px) {
+    #tabla-ventas .col-unid { display: none; }
+    #tabla-ventas .resumen { max-width: 170px !important; }
+  }
 </style>
 {% endblock %}
 
@@ -36,7 +47,7 @@
 </div>
 
 <div class="row g-3 mb-4">
-  <div class="col-6 col-lg-3"><div class="stat"><div class="stat-label">Boletas</div><div class="stat-value" id="k-ventas">0</div></div></div>
+  <div class="col-6 col-lg-3"><div class="stat"><div class="stat-label">Boletas</div><div class="stat-value" id="k-ventas">0</div><div class="stat-foot" id="k-anuladas"></div></div></div>
   <div class="col-6 col-lg-3"><div class="stat"><div class="stat-label">Total vendido</div><div class="stat-value" id="k-total">$0</div></div></div>
   <div class="col-6 col-lg-3"><div class="stat"><div class="stat-label">Unidades</div><div class="stat-value" id="k-unidades">0</div></div></div>
   <div class="col-6 col-lg-3"><div class="stat"><div class="stat-label">Ticket promedio</div><div class="stat-value" id="k-ticket">$0</div></div></div>
@@ -48,7 +59,13 @@
       <i class="bi bi-search"></i>
       <input type="search" id="h-search" class="form-control" placeholder="Buscar por N° de boleta, producto o colegio…">
     </div>
-    <span class="text-secondary small">Haz clic en una boleta para ver su detalle</span>
+    <div class="d-flex align-items-center gap-3">
+      <div class="form-check form-switch m-0">
+        <input class="form-check-input" type="checkbox" role="switch" id="ver-anuladas" checked>
+        <label class="form-check-label small" for="ver-anuladas">Mostrar anuladas</label>
+      </div>
+      <span class="text-secondary small d-none d-xl-inline">Haz clic en una boleta para ver su detalle</span>
+    </div>
   </div>
   <div class="table-responsive">
     <table id="tabla-ventas" class="table-app" style="width:100%">
@@ -58,12 +75,49 @@
           <th>Boleta</th>
           <th>Fecha</th>
           <th>Productos</th>
-          <th class="num">Unidades</th>
+          <th class="num col-unid">Unidades</th>
           <th class="num">Total</th>
           <th class="text-end"></th>
         </tr>
       </thead>
     </table>
+  </div>
+</div>
+
+<!-- Modal anular venta -->
+<div class="modal fade" id="modalAnular" tabindex="-1" aria-labelledby="modalAnularLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalAnularLabel">Anular boleta N° <span id="an-num"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <div class="d-flex justify-content-between mb-3 p-3 rounded-3" style="background:var(--surface-2)">
+          <span class="text-secondary" id="an-resumen"></span>
+          <strong class="tabular" id="an-total"></strong>
+        </div>
+        <label class="form-label" for="an-motivo">Motivo</label>
+        <select class="form-select mb-2" id="an-motivo">
+          <option>Venta de prueba</option>
+          <option>Error al registrar la venta</option>
+          <option>Devolución del cliente</option>
+          <option>Cambio de producto</option>
+          <option value="otro">Otro…</option>
+        </select>
+        <input type="text" class="form-control d-none mb-2" id="an-otro" maxlength="200" placeholder="Escribe el motivo">
+        <div class="form-check mt-3">
+          <input class="form-check-input" type="checkbox" id="an-stock" checked>
+          <label class="form-check-label" for="an-stock">Devolver los productos al inventario</label>
+          <div class="field-help">Desmárcalo si los productos no vuelven a la tienda (por ejemplo, si se entregaron dañados).</div>
+        </div>
+        <div class="field-help mt-3"><i class="bi bi-info-circle me-1"></i>La boleta queda en el historial marcada como anulada y deja de contar en los totales y en el análisis. Esta acción no se puede deshacer.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light-border" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-danger" id="an-confirmar"><i class="bi bi-x-octagon me-1"></i>Anular venta</button>
+      </div>
+    </div>
   </div>
 </div>
 {{ ventas_data|json_script:"ventas-data" }}
@@ -72,21 +126,33 @@
 {% block extra_scripts %}
 <script>
 const BOLETA_URL = "{% url 'boleta' 0 %}";
-const ventas =JSON.parse(document.getElementById('ventas-data').textContent).map(v => {
-  v.fechaObj = new Date(v.fecha);
-  v.dia = toISODate(v.fechaObj);
-  v.resumen = v.items.map(i => `${i.nombre} ${i.talla}`).join(' · ');
-  v._q = `${v.id} ${v.metodo_pago_nombre} ${v.items.map(i => `${i.nombre} ${i.talla} ${i.colegio}`).join(' ')}`;
-  return v;
-});
+const ANULAR_URL = "{% url 'anular_venta' 0 %}";
 
 function toISODate(d) {
   const z = n => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
 }
 
+function preparar(v) {
+  v.fechaObj = new Date(v.fecha);
+  v.dia = toISODate(v.fechaObj);
+  v.resumen = v.items.map(i => `${i.nombre} ${i.talla}`).join(' · ');
+  v._q = `${v.id} ${v.metodo_pago_nombre} ${v.anulada ? 'anulada' : ''} ${v.items.map(i => `${i.nombre} ${i.talla} ${i.colegio}`).join(' ')}`;
+  return v;
+}
+
+const ventas = JSON.parse(document.getElementById('ventas-data').textContent).map(preparar);
+
+// Datos que necesita la boleta (imprimir / PDF)
+function paraBoleta(v) {
+  return { id: v.id, fecha: v.fechaObj, total: v.total, items: v.items, metodo_pago: v.metodo_pago,
+           anulada: v.anulada, fecha_anulacion: v.fecha_anulacion, motivo_anulacion: v.motivo_anulacion };
+}
+
 function detalleHtml(v) {
-  return `<div class="detail-wrap"><table class="detail-table">
+  const nota = v.anulada ? `<div class="nota-anulada"><i class="bi bi-x-octagon-fill me-1"></i>
+      <strong>Anulada</strong> el ${App.esc(App.formatDateTime(v.fecha_anulacion))} · ${App.esc(v.motivo_anulacion || 'sin motivo')}</div>` : '';
+  return `<div class="detail-wrap">${nota}<table class="detail-table">
     <thead><tr><th>Producto</th><th>Colegio</th><th class="text-end">Cant.</th><th class="text-end">Precio</th><th class="text-end">Subtotal</th></tr></thead>
     <tbody>${v.items.map(i => `<tr>
       <td><strong>${App.esc(i.nombre)}</strong> <span class="badge-soft badge-muted ms-1">${App.esc(i.talla)}</span></td>
@@ -99,9 +165,13 @@ function detalleHtml(v) {
 
 $(function () {
   let desde = '', hasta = '';
+  let verAnuladas = true;
+  let filaAnular = null;
+  const modalAnular = new bootstrap.Modal('#modalAnular');
 
   $.fn.dataTable.ext.search.push(function (settings, data, idx, row) {
     if (settings.nTable.id !== 'tabla-ventas') return true;
+    if (!verAnuladas && row.anulada) return false;
     return (!desde || row.dia >= desde) && (!hasta || row.dia <= hasta);
   });
 
@@ -113,7 +183,9 @@ $(function () {
     order: [[2, 'desc']],
     columns: [
       { data: null, orderable: false, defaultContent: '<button class="btn-icon btn-expand" title="Ver detalle"><i class="bi bi-chevron-right"></i></button>' },
-      { data: 'id', render: (d, t) => t === 'display' ? `<span class="cell-strong">N° ${d}</span>` : d },
+      { data: 'id', render: (d, t, r) => t === 'display'
+          ? `<span class="cell-strong">N° ${d}</span>${r.anulada ? '<div><span class="badge-soft badge-danger mt-1">Anulada</span></div>' : ''}`
+          : d },
       { data: 'fecha', render: (d, t, r) => {
           if (t === 'display') {
             const m = App.METODOS_PAGO[r.metodo_pago] || App.METODOS_PAGO.efectivo;
@@ -122,22 +194,27 @@ $(function () {
           return t === 'filter' ? App.formatDateTime(r.fechaObj) : d;
         } },
       { data: '_q', render: (d, t, r) => t === 'display'
-          ? `<span class="d-inline-block text-truncate" style="max-width:360px">${App.esc(r.resumen)}</span><div class="cell-sub">${r.items.length} línea${r.items.length === 1 ? '' : 's'}</div>`
+          ? `<span class="d-inline-block text-truncate resumen" style="max-width:260px">${App.esc(r.resumen)}</span><div class="cell-sub">${r.items.length} línea${r.items.length === 1 ? '' : 's'}</div>`
           : d },
-      { data: 'unidades', className: 'num' },
-      { data: 'total', className: 'num', render: (d, t) => t === 'display' ? `<strong>${App.money(d)}</strong>` : d },
-      { data: 'id', orderable: false, className: 'text-end text-nowrap', render: d => `
+      { data: 'unidades', className: 'num col-unid' },
+      { data: 'total', className: 'num', render: (d, t) => t === 'display' ? `<strong class="monto">${App.money(d)}</strong>` : d },
+      { data: 'id', orderable: false, className: 'text-end text-nowrap', render: (d, t, r) => `
           <a href="${BOLETA_URL.replace('/0/', '/' + d + '/')}" class="btn-icon js-accion" title="Ver boleta"><i class="bi bi-receipt"></i></a>
           <button class="btn-icon js-accion btn-print ms-1" title="Imprimir boleta"><i class="bi bi-printer"></i></button>
-          <button class="btn-icon js-accion btn-pdf ms-1" title="Descargar PDF"><i class="bi bi-download"></i></button>` }
+          <button class="btn-icon js-accion btn-pdf ms-1" title="Descargar PDF"><i class="bi bi-download"></i></button>
+          ${r.anulada ? '' : '<button class="btn-icon danger js-accion btn-anular ms-1" title="Anular venta"><i class="bi bi-x-octagon"></i></button>'}` }
     ],
+    rowCallback: (row, data) => $(row).toggleClass('anulada', !!data.anulada),
     drawCallback: function () {
-      const rows = this.api().rows({ search: 'applied' }).data().toArray();
-      const total = rows.reduce((a, r) => a + r.total, 0);
-      $('#k-ventas').text(App.num(rows.length));
+      const filas = this.api().rows({ search: 'applied' }).data().toArray();
+      const validas = filas.filter(r => !r.anulada);
+      const total = validas.reduce((a, r) => a + r.total, 0);
+      const anuladas = filas.length - validas.length;
+      $('#k-ventas').text(App.num(validas.length));
+      $('#k-anuladas').text(anuladas ? `${anuladas} anulada${anuladas === 1 ? '' : 's'} (no cuentan)` : '');
       $('#k-total').text(App.money(total));
-      $('#k-unidades').text(App.num(rows.reduce((a, r) => a + r.unidades, 0)));
-      $('#k-ticket').text(App.money(rows.length ? total / rows.length : 0));
+      $('#k-unidades').text(App.num(validas.reduce((a, r) => a + r.unidades, 0)));
+      $('#k-ticket').text(App.money(validas.length ? total / validas.length : 0));
     }
   });
 
@@ -150,19 +227,61 @@ $(function () {
 
   $('#tabla-ventas tbody').on('click', '.btn-print', function (e) {
     e.stopPropagation();
-    const v = table.row($(this).closest('tr')).data();
-    App.printReceipt({ id: v.id, fecha: v.fechaObj, total: v.total, items: v.items, metodo_pago: v.metodo_pago });
+    App.printReceipt(paraBoleta(table.row($(this).closest('tr')).data()));
   });
 
   $('#tabla-ventas tbody').on('click', '.btn-pdf', async function (e) {
     e.stopPropagation();
     const btn = $(this).prop('disabled', true);
-    const v = table.row(btn.closest('tr')).data();
-    await App.downloadReceipt({ id: v.id, fecha: v.fechaObj, total: v.total, items: v.items, metodo_pago: v.metodo_pago });
+    await App.downloadReceipt(paraBoleta(table.row(btn.closest('tr')).data()));
     btn.prop('disabled', false);
   });
 
+  /* ---------- Anular ---------- */
+  $('#tabla-ventas tbody').on('click', '.btn-anular', function (e) {
+    e.stopPropagation();
+    filaAnular = table.row($(this).closest('tr'));
+    const v = filaAnular.data();
+    $('#an-num').text(v.id);
+    $('#an-resumen').text(`${v.unidades} unidad${v.unidades === 1 ? '' : 'es'} · ${App.formatDateTime(v.fechaObj)}`);
+    $('#an-total').text(App.money(v.total));
+    $('#an-motivo').val('Venta de prueba');
+    $('#an-otro').val('').addClass('d-none');
+    $('#an-stock').prop('checked', true);
+    modalAnular.show();
+  });
+
+  $('#an-motivo').on('change', function () {
+    $('#an-otro').toggleClass('d-none', this.value !== 'otro');
+    if (this.value === 'otro') $('#an-otro').focus();
+  });
+
+  $('#an-confirmar').on('click', function () {
+    const v = filaAnular && filaAnular.data();
+    if (!v) return;
+    const motivo = $('#an-motivo').val() === 'otro' ? $('#an-otro').val().trim() : $('#an-motivo').val();
+    if (!motivo) { App.toast('Escribe el motivo de la anulación', 'warning'); $('#an-otro').focus(); return; }
+    const btn = $(this).prop('disabled', true);
+    $.ajax({
+      url: ANULAR_URL.replace('/0/', '/' + v.id + '/'),
+      method: 'POST',
+      contentType: 'application/json',
+      headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+      data: JSON.stringify({ motivo, devolver_stock: $('#an-stock').prop('checked') })
+    }).done(res => {
+      const nodo = $(filaAnular.node());
+      if (filaAnular.child.isShown()) { filaAnular.child.hide(); nodo.removeClass('shown'); }
+      filaAnular.data(preparar(res.venta)).draw(false);
+      modalAnular.hide();
+      App.toast(`Boleta N° ${v.id} anulada${$('#an-stock').prop('checked') ? ' y productos devueltos al inventario' : ''}`, 'success', 4500);
+    }).fail(xhr => {
+      App.toast((xhr.responseJSON && xhr.responseJSON.message) || 'No se pudo anular la venta', 'error', 5000);
+    }).always(() => btn.prop('disabled', false));
+  });
+
+  /* ---------- Filtros ---------- */
   $('#h-search').on('input', function () { table.search(this.value).draw(); });
+  $('#ver-anuladas').on('change', function () { verAnuladas = this.checked; table.draw(); });
 
   function aplicarFechas() {
     desde = $('#f-desde').val();

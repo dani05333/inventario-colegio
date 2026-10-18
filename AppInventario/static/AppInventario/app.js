@@ -92,6 +92,8 @@ const App = (function () {
         <hr>
         <div><strong>Boleta N° ${esc(venta.id ?? '—')}</strong></div>
         <div>${esc(formatDateTime(venta.fecha))}</div>
+        ${venta.anulada ? `<div class="center total" style="margin-top:6px">*** VENTA ANULADA ***</div>
+        <div class="center">${esc(formatDateTime(venta.fecha_anulacion))}${venta.motivo_anulacion ? ' · ' + esc(venta.motivo_anulacion) : ''}</div>` : ''}
         <hr>
         <table>${rows}</table>
         <hr>

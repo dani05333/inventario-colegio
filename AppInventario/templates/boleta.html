@@ -26,6 +26,12 @@
   <a href="{% url 'historial_ventas' %}" class="d-inline-flex align-items-center gap-1 text-secondary"><i class="bi bi-arrow-left"></i> Volver al historial</a>
 </div>
 
+{% if venta.anulada %}
+<div class="d-flex align-items-center gap-2 p-3 mb-3 rounded-3 mx-auto" style="max-width:860px;background:var(--danger-50);color:var(--danger)">
+  <i class="bi bi-x-octagon-fill fs-5"></i>
+  <div><strong>Venta anulada</strong> el {{ venta.fecha_anulacion|date:"d-m-Y H:i" }}{% if venta.motivo_anulacion %} · {{ venta.motivo_anulacion }}{% endif %}. No cuenta en los totales ni en el análisis.</div>
+</div>
+{% endif %}
 <div class="boleta-wrap">
   <div class="paper">
     <div id="boleta"></div>

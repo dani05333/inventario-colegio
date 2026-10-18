@@ -51,6 +51,10 @@ class Venta(models.Model):
     fecha = models.DateTimeField(auto_now_add=True)
     total = models.DecimalField(**MONTO)
     metodo_pago = models.CharField(max_length=20, choices=METODOS_PAGO, default='efectivo')
+    # Una venta anulada queda registrada (con su motivo) pero no cuenta en totales ni análisis
+    anulada = models.BooleanField(default=False)
+    fecha_anulacion = models.DateTimeField(null=True, blank=True)
+    motivo_anulacion = models.CharField(max_length=200, blank=True)
 
 class DetalleVenta(models.Model):
     venta = models.ForeignKey(Venta, on_delete=models.CASCADE)

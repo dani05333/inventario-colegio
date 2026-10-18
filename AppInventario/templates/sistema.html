@@ -75,6 +75,35 @@
   </div>
 </div>
 
+<!-- Borrar ventas de prueba -->
+<div class="panel mt-4" style="max-width:1100px;border-color:#f3c7c7">
+  <div class="panel-header">
+    <div>
+      <h2 class="panel-title text-danger"><i class="bi bi-exclamation-octagon me-1"></i>Borrar ventas de prueba</h2>
+      <p class="panel-sub">Para dejar el sistema limpio después de practicar, antes de empezar a vender de verdad</p>
+    </div>
+  </div>
+  <div class="panel-body">
+    <p class="mb-2">Elimina <strong>todas las ventas</strong> del historial ({{ total_ventas }} en total{% if ventas_anuladas %}, {{ ventas_anuladas }} anulada{{ ventas_anuladas|pluralize }}{% endif %}). El inventario, los colegios, uniformes y tallas no se tocan.</p>
+    <ul class="small text-secondary mb-3">
+      <li>Antes de borrar se crea un respaldo automático de la base de datos.</li>
+      <li>Para ventas puntuales (un error, una devolución) usa mejor <strong>Anular</strong> en el historial.</li>
+    </ul>
+    <div class="form-check mb-3">
+      <input class="form-check-input" type="checkbox" id="bv-stock" checked>
+      <label class="form-check-label" for="bv-stock">Devolver al inventario las unidades vendidas</label>
+      <div class="field-help">Recomendado si las ventas eran de práctica: así el stock vuelve a quedar como estaba.</div>
+    </div>
+    <label class="form-label" for="bv-confirmar">Para confirmar, escribe <strong>BORRAR</strong></label>
+    <div class="d-flex gap-2 flex-wrap">
+      <input type="text" class="form-control" id="bv-confirmar" autocomplete="off" style="max-width:220px" placeholder="BORRAR">
+      <button class="btn btn-danger" id="btn-borrar-ventas" disabled {% if not total_ventas %}title="No hay ventas"{% endif %}>
+        <i class="bi bi-trash3 me-1"></i>Borrar todas las ventas
+      </button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="overlay">
   <div>
     <div class="spinner-border mb-4"></div>
@@ -157,6 +186,27 @@ $('#btn-respaldar').on('click', function () {
     .done(r => { App.toast(`Respaldo creado: ${r.archivo}`, 'success'); setTimeout(() => location.reload(), 900); })
     .fail(xhr => App.toast((xhr.responseJSON && xhr.responseJSON.message) || 'No se pudo respaldar', 'error', 6000))
     .always(() => btn.prop('disabled', false));
+});
+
+/* ---------- Borrar ventas de prueba ---------- */
+const HAY_VENTAS = {{ total_ventas|default:0 }} > 0;
+$('#bv-confirmar').on('input', function () {
+  $('#btn-borrar-ventas').prop('disabled', !(HAY_VENTAS && this.value.trim() === 'BORRAR'));
+});
+$('#btn-borrar-ventas').on('click', function () {
+  if (!confirm('Se eliminarán TODAS las ventas del historial. ¿Continuar?')) return;
+  const btn = $(this).prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Borrando…');
+  $.ajax({
+    url: "{% url 'borrar_ventas' %}", method: 'POST', contentType: 'application/json',
+    headers: { 'X-CSRFToken': CSRF },
+    data: JSON.stringify({ confirmacion: $('#bv-confirmar').val().trim(), devolver_stock: $('#bv-stock').prop('checked') })
+  }).done(r => {
+    App.toast(`Se borraron ${r.borradas} venta${r.borradas === 1 ? '' : 's'}${r.respaldo ? '. Respaldo previo: ' + r.respaldo : ''}`, 'success', 6000);
+    setTimeout(() => location.reload(), 1500);
+  }).fail(xhr => {
+    App.toast((xhr.responseJSON && xhr.responseJSON.message) || 'No se pudieron borrar las ventas', 'error', 6000);
+    btn.prop('disabled', false).html('<i class="bi bi-trash3 me-1"></i>Borrar todas las ventas');
+  });
 });
 
 {% if INSTALADO %}if (new URLSearchParams(location.search).get('buscar')) $('#btn-buscar').click();{% endif %}
