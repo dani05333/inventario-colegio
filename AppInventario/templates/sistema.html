@@ -14,6 +14,12 @@
   .update-box.error { background: var(--warning-50); color: var(--warning); }
   .notas { white-space: pre-wrap; font-size: 13.5px; color: var(--text-2); background: #fff; border-radius: 10px; padding: 12px 14px; margin: 10px 0 14px; max-height: 220px; overflow: auto; border: 1px solid var(--border); }
   .ruta { font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; word-break: break-all; }
+  .pr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .pr-item { position: relative; aspect-ratio: 4 / 3; border-radius: 12px; overflow: hidden; background: #111; border: 1px solid var(--border); }
+  .pr-item img { width: 100%; height: 100%; object-fit: contain; }
+  .pr-num { position: absolute; left: 8px; top: 8px; background: rgba(0, 0, 0, .6); color: #fff; font-size: 12px; font-weight: 700; border-radius: 999px; min-width: 22px; height: 22px; display: grid; place-items: center; padding: 0 6px; }
+  .pr-del { position: absolute; right: 8px; top: 8px; width: 28px; height: 28px; border-radius: 50%; border: 0; background: rgba(255, 255, 255, .92); color: var(--danger); display: grid; place-items: center; }
+  .pr-del:hover { background: #fff; box-shadow: 0 2px 8px rgba(0, 0, 0, .3); }
   .overlay {
     position: fixed; inset: 0; z-index: 3000; background: rgba(244, 245, 249, .96);
     display: none; align-items: center; justify-content: center; text-align: center; padding: 24px;
@@ -71,6 +77,65 @@
     </div>
     <div class="modal-footer justify-content-start small text-secondary">
       <i class="bi bi-lightbulb me-1"></i>Consejo: de vez en cuando copia esta carpeta a un pendrive o a la nube.
+    </div>
+  </div>
+</div>
+
+<!-- Presentación en la pantalla del cliente -->
+<div class="panel mt-4" style="max-width:1100px" id="presentacion">
+  <div class="panel-header flex-wrap">
+    <div>
+      <h2 class="panel-title"><i class="bi bi-images me-1"></i>Presentación en la pantalla del cliente</h2>
+      <p class="panel-sub">Mientras no se está vendiendo, la pantalla del cliente muestra estas imágenes una tras otra</p>
+    </div>
+    <div class="form-check form-switch m-0 d-flex align-items-center gap-2">
+      <input class="form-check-input m-0" type="checkbox" role="switch" id="pr-activa" {% if presentacion.activa %}checked{% endif %} style="width:2.6em;height:1.4em">
+      <label class="form-check-label fw-semibold" for="pr-activa" id="pr-activa-txt">{% if presentacion.activa %}Activada{% else %}Desactivada{% endif %}</label>
+    </div>
+  </div>
+  <div class="panel-body">
+    <div class="d-flex flex-wrap gap-3 align-items-end mb-3">
+      <div>
+        <label class="form-label" for="pr-segundos">Tiempo de cada imagen</label>
+        <select class="form-select" id="pr-segundos" style="width:auto">
+          {% for s in segundos_opciones %}<option value="{{ s }}" {% if s == presentacion.segundos %}selected{% endif %}>{{ s }} segundos</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <input type="file" id="pr-archivos" accept=".jpg,.jpeg,.png,.webp" multiple class="d-none">
+        <button class="btn btn-soft" id="pr-subir"><i class="bi bi-upload me-1"></i>Agregar imágenes</button>
+      </div>
+      <a href="{% url 'pantalla_cliente' %}" target="_blank" class="btn btn-light-border"><i class="bi bi-display me-1"></i>Ver pantalla del cliente</a>
+    </div>
+    <div class="pr-grid" id="pr-grid">
+      {% for nombre in presentacion_imagenes %}
+      <div class="pr-item" data-nombre="{{ nombre }}">
+        <img src="{% url 'presentacion_imagen' nombre %}" alt="" loading="lazy">
+        <span class="pr-num">{{ forloop.counter }}</span>
+        <button class="pr-del" title="Quitar imagen"><i class="bi bi-x-lg"></i></button>
+      </div>
+      {% empty %}
+      <div class="empty py-4" style="grid-column:1/-1"><i class="bi bi-images"></i><strong>No hay imágenes</strong>Mientras no haya imágenes se muestra la pantalla de bienvenida.</div>
+      {% endfor %}
+    </div>
+    <div class="field-help mt-2">JPG, PNG o WEBP de hasta 10 MB. Se muestran completas, en el orden en que se agregaron. Quitar una imagen pide la clave de administrador.</div>
+  </div>
+</div>
+
+<!-- Modal: pedir clave para quitar imagen -->
+<div class="modal fade" id="modalClaveImg" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Quitar imagen</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div>
+      <div class="modal-body">
+        <img id="ci-preview" src="" alt="" class="w-100 rounded-3 mb-3" style="max-height:140px;object-fit:contain;background:var(--surface-2)">
+        <label class="form-label" for="ci-clave"><i class="bi bi-shield-lock me-1"></i>Clave de administrador</label>
+        <input type="password" class="form-control" id="ci-clave" autocomplete="off">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light-border" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-danger" id="ci-confirmar">Quitar</button>
+      </div>
     </div>
   </div>
 </div>
@@ -252,6 +317,72 @@ $('#btn-borrar-ventas').on('click', function () {
     btn.prop('disabled', false).html('<i class="bi bi-trash3 me-1"></i>Borrar todas las ventas');
     $('#bv-clave').val('');
   });
+});
+
+/* ---------- Presentación en la pantalla del cliente ---------- */
+const canalCliente = 'BroadcastChannel' in window ? new BroadcastChannel('pos-pantalla-cliente') : null;
+const avisarPantalla = () => { if (canalCliente) canalCliente.postMessage({ tipo: 'presentacion' }); };
+
+function guardarPresentacion() {
+  $.ajax({
+    url: "{% url 'presentacion_config' %}", method: 'POST', contentType: 'application/json',
+    headers: { 'X-CSRFToken': CSRF },
+    data: JSON.stringify({ activa: $('#pr-activa').prop('checked'), segundos: Number($('#pr-segundos').val()) })
+  }).done(r => {
+    $('#pr-activa-txt').text(r.activa ? 'Activada' : 'Desactivada');
+    App.toast(r.activa ? `Presentación activada (${r.segundos} s por imagen)` : 'Presentación desactivada: se mostrará la bienvenida', 'success');
+    avisarPantalla();
+  }).fail(() => App.toast('No se pudo guardar', 'error'));
+}
+$('#pr-activa, #pr-segundos').on('change', guardarPresentacion);
+
+$('#pr-subir').on('click', () => $('#pr-archivos').click());
+$('#pr-archivos').on('change', function () {
+  if (!this.files.length) return;
+  const datos = new FormData();
+  [...this.files].forEach(f => datos.append('imagenes', f));
+  const btn = $('#pr-subir').prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Subiendo…');
+  $.ajax({ url: "{% url 'presentacion_subir' %}", method: 'POST', headers: { 'X-CSRFToken': CSRF }, data: datos, processData: false, contentType: false })
+    .done(r => {
+      (r.errores || []).forEach(e => App.toast(e, 'warning', 6000));
+      App.toast(`${r.guardadas.length} imagen${r.guardadas.length === 1 ? '' : 'es'} agregada${r.guardadas.length === 1 ? '' : 's'}`, 'success');
+      avisarPantalla();
+      setTimeout(() => { location.hash = 'presentacion'; location.reload(); }, 1000);
+    })
+    .fail(xhr => {
+      ((xhr.responseJSON && xhr.responseJSON.errores) || ['No se pudieron subir las imágenes']).forEach(e => App.toast(e, 'error', 6000));
+      btn.prop('disabled', false).html('<i class="bi bi-upload me-1"></i>Agregar imágenes');
+    });
+  this.value = '';
+});
+
+const modalClaveImg = new bootstrap.Modal('#modalClaveImg');
+let imagenQuitar = null;
+$('#pr-grid').on('click', '.pr-del', function () {
+  const item = $(this).closest('.pr-item');
+  imagenQuitar = item.data('nombre');
+  $('#ci-preview').attr('src', item.find('img').attr('src'));
+  $('#ci-clave').val('');
+  modalClaveImg.show();
+});
+$('#modalClaveImg').on('shown.bs.modal', () => $('#ci-clave').focus());
+$('#ci-clave').on('keydown', e => { if (e.key === 'Enter') $('#ci-confirmar').click(); });
+$('#ci-confirmar').on('click', function () {
+  const btn = $(this).prop('disabled', true);
+  $.ajax({
+    url: "{% url 'presentacion_eliminar' %}", method: 'POST', contentType: 'application/json',
+    headers: { 'X-CSRFToken': CSRF },
+    data: JSON.stringify({ nombre: imagenQuitar, clave: $('#ci-clave').val() })
+  }).done(() => {
+    modalClaveImg.hide();
+    $(`.pr-item[data-nombre="${CSS.escape(imagenQuitar)}"]`).remove();
+    $('#pr-grid .pr-num').each((i, el) => $(el).text(i + 1));
+    App.toast('Imagen quitada de la presentación', 'success');
+    avisarPantalla();
+  }).fail(xhr => {
+    App.toast((xhr.responseJSON && xhr.responseJSON.message) || 'No se pudo quitar', 'error', 5000);
+    $('#ci-clave').val('').focus();
+  }).always(() => btn.prop('disabled', false));
 });
 
 /* ---------- Clave de administrador ---------- */

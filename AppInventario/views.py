@@ -8,15 +8,15 @@ from django.conf import settings
 from django.core.paginator import Paginator
 from django.db import models, transaction
 from django.db.models import F, ProtectedError, Q, Sum
-from django.http import JsonResponse
+from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, render
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_GET, require_POST
 from django.views.generic.edit import CreateView, DeleteView, UpdateView
 
-from . import seguridad, sistema
+from . import presentacion, seguridad, sistema
 from .models import Colegio, DetalleVenta, Inventario, Talla, Uniforme, Venta
 
 logger = logging.getLogger(__name__)
@@ -448,7 +448,71 @@ def ver_sistema(request):
         'datos_dir': settings.DATA_DIR,
         'total_ventas': Venta.objects.count(),
         'ventas_anuladas': Venta.objects.filter(anulada=True).count(),
+        'presentacion': presentacion.ajustes(),
+        'presentacion_imagenes': presentacion.imagenes(),
+        'segundos_opciones': presentacion.SEGUNDOS_OPCIONES,
     })
+
+
+# ---------------------------------------------------------------------------
+# Presentación de imágenes en la pantalla del cliente
+# ---------------------------------------------------------------------------
+
+@require_GET
+def presentacion_datos(request):
+    return JsonResponse({
+        **presentacion.ajustes(),
+        'imagenes': [reverse('presentacion_imagen', args=[n]) for n in presentacion.imagenes()],
+    })
+
+
+@require_GET
+def presentacion_imagen(request, nombre):
+    ruta = presentacion.ruta_segura(nombre)
+    if ruta is None:
+        raise Http404
+    respuesta = FileResponse(open(ruta, 'rb'))
+    respuesta['Cache-Control'] = 'max-age=86400'
+    return respuesta
+
+
+@require_POST
+def presentacion_config(request):
+    try:
+        datos = json.loads(request.body or '{}')
+        presentacion.guardar_ajustes(bool(datos.get('activa')), datos.get('segundos', 5))
+    except (ValueError, TypeError, json.JSONDecodeError):
+        return _error('Ajustes no válidos.')
+    return JsonResponse({'status': 'success', **presentacion.ajustes()})
+
+
+@require_POST
+def presentacion_subir(request):
+    archivos = request.FILES.getlist('imagenes')
+    if not archivos:
+        return _error('Elige al menos una imagen.')
+    guardadas, errores = [], []
+    for archivo in archivos:
+        try:
+            guardadas.append(presentacion.guardar_subida(archivo))
+        except ValueError as e:
+            errores.append(str(e))
+    return JsonResponse({'status': 'success' if guardadas else 'error', 'guardadas': guardadas, 'errores': errores},
+                        status=200 if guardadas else 400)
+
+
+@require_POST
+def presentacion_eliminar(request):
+    try:
+        datos = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        datos = {}
+    try:
+        seguridad.verificar(datos.get('clave'))
+        presentacion.eliminar(datos.get('nombre'))
+    except (seguridad.ClaveError, ValueError) as e:
+        return _error(str(e))
+    return JsonResponse({'status': 'success'})
 
 
 @require_POST

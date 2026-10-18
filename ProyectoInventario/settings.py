@@ -32,8 +32,10 @@ INSTALADO = bool(DATA_DIR)
 if INSTALADO:
     DATA_DIR = Path(DATA_DIR)
     RESPALDOS_DIR = Path(os.environ.get('CHLOE_BACKUP_DIR') or DATA_DIR / 'respaldos')
+    PRESENTACION_DIR = DATA_DIR / 'presentacion'
 else:
     RESPALDOS_DIR = BASE_DIR / 'respaldos'
+    PRESENTACION_DIR = BASE_DIR / 'media' / 'presentacion'
 
 if INSTALADO:
     # Clave única por instalación, generada por el lanzador

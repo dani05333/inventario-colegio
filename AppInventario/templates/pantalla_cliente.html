@@ -91,6 +91,13 @@
       transition: opacity .3s;
     }
     .fs-hint.hide { opacity: 0; pointer-events: none; }
+
+    /* Presentación de imágenes (cuando no hay venta): pantalla completa, con fundido entre imágenes */
+    .v-presentacion { position: fixed; inset: 0; z-index: 5; background: #000; }
+    .slide { position: absolute; inset: 0; opacity: 0; transition: opacity 1.2s ease; overflow: hidden; }
+    .slide.on { opacity: 1; }
+    .slide .fondo { position: absolute; inset: -6%; background-size: cover; background-position: center; filter: blur(40px) brightness(.55) saturate(1.2); transform: scale(1.1); }
+    .slide img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 2vmin; }
   </style>
 </head>
 <body>
@@ -110,6 +117,8 @@
         <h1>¡Bienvenido/a!</h1>
         <p>Chloe Creaciones · Uniformes escolares</p>
       </section>
+
+      <section class="vista v-presentacion" id="v-presentacion"></section>
 
       <section class="vista v-venta" id="v-venta">
         <div class="lista">
@@ -148,23 +157,65 @@
   const canal = 'BroadcastChannel' in window ? new BroadcastChannel('pos-pantalla-cliente') : null;
   let timerGracias = null;
 
+  /* ---------- Presentación de imágenes ---------- */
+  let pres = { activa: false, segundos: 5, imagenes: [] };
+  let presTimer = null, presIndice = 0, enReposo = true;
+
+  function cargarPresentacion() {
+    return fetch("{% url 'presentacion_datos' %}", { cache: 'no-store' })
+      .then(r => r.json())
+      .then(d => {
+        const cambio = JSON.stringify(d) !== JSON.stringify(pres);
+        pres = d;
+        if (!cambio) return;
+        document.getElementById('v-presentacion').innerHTML = pres.imagenes.map(url => `
+          <div class="slide"><div class="fondo" style="background-image:url('${url}')"></div><img src="${url}" alt=""></div>`).join('');
+        presIndice = 0;
+        detenerPresentacion();
+        if (enReposo) mostrarReposo();
+      })
+      .catch(() => {});
+  }
+
+  function detenerPresentacion() { clearInterval(presTimer); presTimer = null; }
+
+  function pasarImagen() {
+    const slides = document.querySelectorAll('#v-presentacion .slide');
+    if (!slides.length) return;
+    slides.forEach((s, i) => s.classList.toggle('on', i === presIndice % slides.length));
+    presIndice = (presIndice + 1) % slides.length;
+  }
+
+  // Sin venta en curso: presentación si está activa y hay imágenes; si no, la bienvenida
+  function mostrarReposo() {
+    enReposo = true;
+    if (pres.activa && pres.imagenes.length) {
+      mostrar('v-presentacion');
+      if (!presTimer) { pasarImagen(); presTimer = setInterval(pasarImagen, pres.segundos * 1000); }
+    } else {
+      mostrar('v-bienvenida');
+    }
+  }
+
   function mostrar(id) {
+    if (id !== 'v-presentacion') detenerPresentacion();
+    if (id === 'v-venta' || id === 'v-gracias') enReposo = false;
     document.querySelectorAll('.vista').forEach(v => v.classList.toggle('on', v.id === id));
   }
 
   function render(e) {
     clearTimeout(timerGracias);
     // Oculta por el vendedor, o sin productos: pantalla de bienvenida (no se ve ningún dato de la venta)
-    if (!e.visible) { mostrar('v-bienvenida'); return; }
+    if (!e.visible) { mostrarReposo(); return; }
 
     if (e.fase === 'gracias' && e.gracias) {
       document.getElementById('g-total').textContent = `Total pagado: ${App.money(e.gracias.total)}${e.gracias.metodo ? ' · ' + e.gracias.metodo : ''}`;
       document.getElementById('g-vuelto').textContent = e.gracias.recibido ? `Su vuelto: ${App.money(e.gracias.vuelto)}` : '';
       mostrar('v-gracias');
-      timerGracias = setTimeout(() => mostrar('v-bienvenida'), 10000);
+      timerGracias = setTimeout(mostrarReposo, 10000);
       return;
     }
-    if (!e.items.length) { mostrar('v-bienvenida'); return; }
+    if (!e.items.length) { mostrarReposo(); return; }
 
     mostrar('v-venta');
 
@@ -201,8 +252,15 @@
     }
   }
 
+  cargarPresentacion();
+  setInterval(cargarPresentacion, 60000);
+
   if (canal) {
-    canal.onmessage = ev => { if (ev.data && ev.data.tipo === 'estado') render(ev.data); };
+    canal.onmessage = ev => {
+      if (!ev.data) return;
+      if (ev.data.tipo === 'estado') render(ev.data);
+      if (ev.data.tipo === 'presentacion') { detenerPresentacion(); pres = {}; cargarPresentacion(); }   // cambió en Sistema
+    };
     canal.postMessage({ tipo: 'hola' });                              // pide el estado actual al punto de venta
     setInterval(() => canal.postMessage({ tipo: 'ping' }), 3000);     // avisa que esta pantalla está abierta
   }

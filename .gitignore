@@ -12,3 +12,4 @@ staticfiles/
 instalador/build/
 instalador/cache/
 instalador/salida/
+media/
