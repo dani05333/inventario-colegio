@@ -17,6 +17,7 @@ from django.views.decorators.http import require_GET, require_POST
 from django.views.generic.edit import CreateView, DeleteView, UpdateView
 
 from . import presentacion, seguridad, sistema
+from .forms import ColegioForm, InventarioForm, TallaForm, UniformeForm
 from .models import Colegio, DetalleVenta, Inventario, Talla, Uniforme, Venta
 
 logger = logging.getLogger(__name__)
@@ -82,35 +83,35 @@ class EliminarProtegidoMixin:
 
 class ColegioCreateView(CreateView):
     model = Colegio
-    fields = ['nombre']
+    form_class = ColegioForm
     template_name = 'crear_colegios.html'
     success_url = reverse_lazy('ver_colegios')
 
 
 class TallaCreateView(CreateView):
     model = Talla
-    fields = ['nombre']
+    form_class = TallaForm
     template_name = 'crear_tallas.html'
     success_url = reverse_lazy('ver_tallas')
 
 
 class UniformeCreateView(CreateView):
     model = Uniforme
-    fields = ['nombre']
+    form_class = UniformeForm
     template_name = 'crear_uniformes.html'
     success_url = reverse_lazy('ver_uniformes')
 
 
 class InventarioCreateView(CreateView):
     model = Inventario
-    fields = ['codigo_barras', 'cantidad', 'colegio', 'talla', 'uniforme', 'precio']
+    form_class = InventarioForm
     template_name = 'crear_inventario.html'
     success_url = reverse_lazy('ver_inventario')
 
 
 class ColegioUpdateView(UpdateView):
     model = Colegio
-    fields = ['nombre']
+    form_class = ColegioForm
     template_name = 'crear_colegios.html'
     success_url = reverse_lazy('ver_colegios')
 
@@ -123,7 +124,7 @@ class ColegioDeleteView(EliminarProtegidoMixin, DeleteView):
 
 class TallasUpdateView(UpdateView):
     model = Talla
-    fields = ['nombre']
+    form_class = TallaForm
     template_name = 'crear_tallas.html'
     success_url = reverse_lazy('ver_tallas')
 
@@ -136,7 +137,7 @@ class TallasDeleteView(EliminarProtegidoMixin, DeleteView):
 
 class UniformeUpdateView(UpdateView):
     model = Uniforme
-    fields = ['nombre']
+    form_class = UniformeForm
     template_name = 'crear_uniformes.html'
     success_url = reverse_lazy('ver_uniformes')
 
@@ -149,7 +150,7 @@ class UniformeDeleteView(EliminarProtegidoMixin, DeleteView):
 
 class InventarioUpdateView(UpdateView):
     model = Inventario
-    fields = ['codigo_barras', 'cantidad', 'colegio', 'talla', 'uniforme', 'precio']
+    form_class = InventarioForm
     template_name = 'crear_inventario.html'
     success_url = reverse_lazy('ver_inventario')
 
