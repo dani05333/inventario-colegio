@@ -47,25 +47,40 @@
   .chip:hover { border-color: var(--border-strong); color: var(--text); }
   .chip.active { background: var(--text); border-color: var(--text); color: #fff; }
 
-  .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin-top: 14px; }
+  .filtros { display: flex; flex-direction: column; gap: 6px; padding-top: 12px; }
+  .filtro-fila { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .filtro-fila .lbl-f { flex: none; width: 58px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .filtro-fila .chips { padding: 0 0 2px; flex: 1; min-width: 0; }
+  .chip.sm { padding: 4px 11px; font-size: 12.5px; }
+
+  .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 14px; }
   .product-card {
-    text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
-    padding: 14px; cursor: pointer; transition: border-color .12s, box-shadow .12s, transform .06s;
-    display: flex; flex-direction: column; gap: 6px; min-height: 132px;
+    position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 13px 14px; display: flex; flex-direction: column; gap: 4px;
   }
-  .product-card:hover { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-50); }
-  .product-card:active { transform: scale(.98); }
-  .product-card.out { opacity: .5; cursor: not-allowed; }
-  .product-card.out:hover { border-color: var(--border); box-shadow: none; }
-  .product-card .p-name { font-weight: 650; line-height: 1.25; }
+  .product-card .p-name { font-weight: 650; line-height: 1.25; padding-right: 26px; }
   .product-card .p-school { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .product-card .p-foot { margin-top: auto; display: flex; align-items: end; justify-content: space-between; gap: 6px; }
-  .product-card .p-price { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .product-card .p-foot { margin-top: 6px; display: flex; align-items: end; justify-content: space-between; gap: 6px; }
+  .product-card .p-price { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
   .product-card .p-stock { font-size: 12px; color: var(--muted); }
-  .product-card .p-stock.low { color: var(--warning); font-weight: 600; }
   .product-card .p-incart {
     position: absolute; top: 10px; right: 10px; min-width: 22px; height: 22px; border-radius: 999px;
     background: var(--primary); color: #fff; font-size: 12px; font-weight: 700; display: grid; place-items: center; padding: 0 6px;
+  }
+  .sizes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .size {
+    position: relative; min-width: 42px; height: 38px; padding: 0 10px; border-radius: 10px;
+    border: 1.5px solid var(--border-strong); background: var(--surface); color: var(--text);
+    font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; transition: border-color .1s, background .1s, transform .06s;
+  }
+  .size:hover { border-color: var(--primary); background: var(--primary-50); }
+  .size:active { transform: scale(.95); }
+  .size.low { border-color: #f0c27b; }
+  .size.match { border-color: var(--primary); background: var(--primary-50); color: var(--primary); box-shadow: 0 0 0 2px var(--primary-100); }
+  .size.out { color: var(--muted); background: var(--surface-2); border-style: dashed; cursor: not-allowed; text-decoration: line-through; }
+  .size .dot {
+    position: absolute; top: -7px; right: -7px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 999px;
+    background: var(--primary); color: #fff; font-size: 11px; display: grid; place-items: center;
   }
 
   .ticket {
@@ -126,10 +141,10 @@
   /* Pantallas bajas (768 px): todo un poco más compacto para que el ticket y el botón Cobrar quepan */
   @media (max-height: 800px) and (min-width: 992px) {
     .scan-bar .form-control { height: 48px; font-size: 16px; }
-    .chips { padding-top: 10px; }
+    .filtros { padding-top: 8px; gap: 4px; }
     .product-grid { gap: 10px; margin-top: 10px; }
-    .product-card { min-height: 112px; padding: 11px 12px; gap: 4px; }
-    .product-card .p-price { font-size: 15px; }
+    .product-card { padding: 11px 12px; }
+    .size { height: 34px; min-width: 38px; }
     .ticket { top: calc(var(--topbar-h) + 18px); height: calc(100vh - var(--topbar-h) - 36px); min-height: 400px; }
     .ticket .panel-header { padding: 12px 16px; }
     .ticket-item { padding: 10px 16px; }
@@ -171,7 +186,11 @@
       <span id="resultado-info">Cargando productos…</span>
       <span class="d-none d-xl-inline"><kbd class="key dark">F2</kbd> buscar · <kbd class="key dark">Enter</kbd> agregar · <kbd class="key dark">F9</kbd> cobrar · <kbd class="key dark">F7</kbd> ocultar al cliente</span>
     </div>
-    <div class="chips" id="chips"></div>
+    <div class="filtros">
+      <div class="filtro-fila d-none" id="fila-colegio"><span class="lbl-f">Colegio</span><div class="chips" id="chips-colegio"></div></div>
+      <div class="filtro-fila d-none" id="fila-prenda"><span class="lbl-f">Prenda</span><div class="chips" id="chips-prenda"></div></div>
+      <div class="filtro-fila d-none" id="fila-talla"><span class="lbl-f">Talla</span><div class="chips" id="chips-talla"></div></div>
+    </div>
     <div class="product-grid" id="grid"></div>
     <div class="empty d-none" id="grid-empty">
       <i class="bi bi-search"></i>
@@ -300,7 +319,7 @@ function cargarProductos() {
     const res = r1[0];
     conjuntosActivos = r2[0].conjuntos;
     productos = res.data.map(p => ({
-      id: p.id, codigo: String(p.codigo_barras), nombre: p.nombre, color: p.color, talla: p.talla,
+      id: p.id, codigo: String(p.codigo_barras), nombre: p.nombre, uniforme: p.uniforme, color: p.color, talla: p.talla,
       colegio: p.colegio, precio: p.precio_unitario, stock: p.cantidad,
       uniforme_id: p.uniforme_id, talla_id: p.talla_id, colegio_id: p.colegio_id,
       _q: `${p.nombre} ${p.talla} ${p.colegio} ${p.codigo_barras}`.toLowerCase()
@@ -311,51 +330,155 @@ function cargarProductos() {
       const p = productos.find(x => x.id === c.id);
       Object.assign(c, { stock: p.stock, precio: p.precio, nombre: p.nombre, uniforme_id: p.uniforme_id, talla_id: p.talla_id, colegio_id: p.colegio_id });
     });
+    armarFamilias();
     renderChips();
     renderGrid();
     renderTicket();
+    ultimaCarga = Date.now();
   }).fail(() => App.toast('No se pudieron cargar los productos', 'error'));
 }
 
+/* ---------- Búsqueda tolerante ----------
+   - sin tildes ni mayúsculas ("pantalon" = "Pantalón")
+   - palabras parciales en cualquier orden ("pant buz 10")
+   - una palabra que es una talla ("10", "s", "xl") se busca como talla exacta
+   - pequeños errores de tipeo en palabras de 4+ letras ("panralon") */
+const sinTildes = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+
+function distancia(a, b) {
+  if (Math.abs(a.length - b.length) > 2) return 9;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const fila = [i];
+    for (let j = 1; j <= b.length; j++) fila[j] = Math.min(prev[j] + 1, fila[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = fila;
+  }
+  return prev[b.length];
+}
+
+// estricto = la palabra existe tal cual en algún producto ("polera"): no se aplica tolerancia, así
+// "polera" no trae "polerón". Solo si no existe en ninguno ("panralon") se busca por parecido.
+function coincide(token, familia, estricto) {
+  if (familia._texto.includes(token)) return true;
+  if (estricto || token.length < 4) return false;
+  const tolerancia = token.length >= 7 ? 2 : 1;
+  return familia._palabras.some(w => distancia(token, w) <= tolerancia || distancia(token, w.slice(0, token.length)) <= tolerancia);
+}
+
+/* Orden natural de tallas: números de menor a mayor, luego XS, S, M, L, XL…, luego el resto */
+const ORDEN_LETRAS = ['xxs', 'xs', 's', 'm', 'l', 'xl', 'xxl', 'xxxl'];
+function claveTalla(t) {
+  const n = sinTildes(t);
+  if (/^\d+([.,]\d+)?$/.test(n)) return [0, parseFloat(n.replace(',', '.')), ''];
+  const i = ORDEN_LETRAS.indexOf(n);
+  return i >= 0 ? [1, i, ''] : [2, 0, n];
+}
+function compararTallas(a, b) {
+  const x = claveTalla(a), y = claveTalla(b);
+  return x[0] - y[0] || x[1] - y[1] || x[2].localeCompare(y[2]);
+}
+
+/* Una "familia" = misma prenda + color + colegio; sus tallas se muestran como botones en una sola tarjeta */
+let familias = [];
+let tallasConocidas = new Set();
+let prendaActiva = '';
+let tallaActiva = '';
+
+function armarFamilias() {
+  const mapa = new Map();
+  productos.forEach(p => {
+    const k = `${p.uniforme_id}|${p.color}|${p.colegio_id}`;
+    if (!mapa.has(k)) mapa.set(k, { key: k, nombre: p.nombre, uniforme: p.uniforme, colegio: p.colegio, variantes: [] });
+    mapa.get(k).variantes.push(p);
+  });
+  familias = [...mapa.values()];
+  familias.forEach(f => {
+    f.variantes.sort((a, b) => compararTallas(a.talla, b.talla));
+    f._texto = sinTildes(`${f.nombre} ${f.colegio} ${f.variantes.map(v => v.codigo).join(' ')}`);
+    f._palabras = f._texto.split(/\s+/);
+  });
+  familias.sort((a, b) => a.colegio.localeCompare(b.colegio) || a.nombre.localeCompare(b.nombre));
+  tallasConocidas = new Set(productos.map(p => sinTildes(p.talla)));
+}
+
+/* Devuelve [{familia, coinciden: Set(ids de las tallas que calzan con la talla pedida), tallaPedida}] */
 function filtrar() {
-  const terms = $buscador.val().toLowerCase().trim().split(/\s+/).filter(Boolean);
-  return productos.filter(p =>
-    (!colegioActivo || p.colegio === colegioActivo) && terms.every(t => p._q.includes(t)));
+  const tokens = sinTildes($buscador.val()).split(/\s+/).filter(Boolean);
+  const tallasPedidas = tokens.filter(t => tallasConocidas.has(t));
+  const palabras = tokens.filter(t => !tallasConocidas.has(t));
+  const estrictas = new Set(palabras.filter(t => familias.some(f => f._texto.includes(t))));
+  if (tallaActiva) tallasPedidas.push(sinTildes(tallaActiva));
+  const res = [];
+  for (const f of familias) {
+    if (colegioActivo && f.colegio !== colegioActivo) continue;
+    if (prendaActiva && f.uniforme !== prendaActiva) continue;
+    if (!palabras.every(t => coincide(t, f, estrictas.has(t)))) continue;
+    const coinciden = new Set();
+    if (tallasPedidas.length) {
+      f.variantes.forEach(v => { if (tallasPedidas.includes(sinTildes(v.talla))) coinciden.add(v.id); });
+      if (!coinciden.size) continue;
+    }
+    res.push({ familia: f, coinciden, tallaPedida: tallasPedidas.length > 0 });
+  }
+  return res;
+}
+
+function chipsHtml(opciones, activa, attr) {
+  return [`<button class="chip sm ${activa ? '' : 'active'}" data-${attr}="">Todos</button>`]
+    .concat(opciones.map(o => `<button class="chip sm ${o === activa ? 'active' : ''}" data-${attr}="${App.esc(o)}">${App.esc(o)}</button>`)).join('');
 }
 
 function renderChips() {
   const colegios = [...new Set(productos.map(p => p.colegio))].sort((a, b) => a.localeCompare(b));
-  const html = [`<button class="chip ${colegioActivo ? '' : 'active'}" data-colegio="">Todos</button>`]
-    .concat(colegios.map(c => `<button class="chip ${c === colegioActivo ? 'active' : ''}" data-colegio="${App.esc(c)}">${App.esc(c)}</button>`));
-  $('#chips').html(colegios.length > 1 ? html.join('') : '');
+  const delColegio = productos.filter(p => !colegioActivo || p.colegio === colegioActivo);
+  const prendas = [...new Set(delColegio.map(p => p.uniforme))].sort((a, b) => a.localeCompare(b));
+  if (prendaActiva && !prendas.includes(prendaActiva)) prendaActiva = '';
+  const deLaPrenda = delColegio.filter(p => !prendaActiva || p.uniforme === prendaActiva);
+  const tallas = [...new Set(deLaPrenda.map(p => p.talla))].sort(compararTallas);
+  if (tallaActiva && !tallas.includes(tallaActiva)) tallaActiva = '';
+
+  $('#chips-colegio').html(chipsHtml(colegios, colegioActivo, 'colegio'));
+  $('#chips-prenda').html(chipsHtml(prendas, prendaActiva, 'prenda'));
+  $('#chips-talla').html(chipsHtml(tallas, tallaActiva, 'talla'));
+  $('#fila-colegio').toggleClass('d-none', colegios.length < 2);
+  $('#fila-prenda').toggleClass('d-none', prendas.length < 2);
+  $('#fila-talla').toggleClass('d-none', tallas.length < 2);
 }
 
 function renderGrid() {
-  const lista = filtrar();
+  const res = filtrar();
   const enCarrito = Object.fromEntries(carrito.map(c => [c.id, c.cantidad]));
-  const html = lista.slice(0, MAX_CARDS).map(p => {
-    const out = p.stock <= 0;
-    const low = !out && p.stock < UMBRAL;
+  const html = res.slice(0, MAX_CARDS).map(({ familia: f, coinciden }) => {
+    const precios = f.variantes.map(v => v.precio);
+    const min = Math.min(...precios), max = Math.max(...precios);
+    const stock = f.variantes.reduce((a, v) => a + Math.max(0, v.stock), 0);
+    const enVenta = f.variantes.reduce((a, v) => a + (enCarrito[v.id] || 0), 0);
+    const botones = f.variantes.map(v => {
+      const out = v.stock <= 0, low = !out && v.stock < UMBRAL;
+      const titulo = `Talla ${v.talla} · ${out ? 'agotado' : v.stock + ' disponibles'} · ${App.money(v.precio)}`;
+      return `<button type="button" class="size ${out ? 'out' : ''} ${low ? 'low' : ''} ${coinciden.has(v.id) ? 'match' : ''}"
+                data-id="${v.id}" title="${App.esc(titulo)}" ${out ? 'disabled' : ''}>${App.esc(v.talla)}${enCarrito[v.id] ? `<span class="dot">${enCarrito[v.id]}</span>` : ''}</button>`;
+    }).join('');
     return `
-      <button class="product-card position-relative ${out ? 'out' : ''}" data-id="${p.id}" ${out ? 'aria-disabled="true"' : ''}>
-        ${enCarrito[p.id] ? `<span class="p-incart">${enCarrito[p.id]}</span>` : ''}
-        <span class="badge-soft badge-muted align-self-start">Talla ${App.esc(p.talla)}</span>
-        <span class="p-name">${App.esc(p.nombre)}</span>
-        <span class="p-school">${App.esc(p.colegio)}</span>
+      <div class="product-card">
+        ${enVenta ? `<span class="p-incart">${enVenta}</span>` : ''}
+        <span class="p-name">${App.esc(f.nombre)}</span>
+        <span class="p-school">${App.esc(f.colegio)}</span>
+        <div class="sizes">${botones}</div>
         <span class="p-foot">
-          <span class="p-price">${App.money(p.precio)}</span>
-          <span class="p-stock ${low ? 'low' : ''}">${out ? 'Agotado' : p.stock + ' disp.'}</span>
+          <span class="p-price">${min === max ? App.money(min) : App.money(min) + ' – ' + App.money(max)}</span>
+          <span class="p-stock ${stock === 0 ? 'low' : ''}">${stock === 0 ? 'Agotado' : stock + ' disp.'}</span>
         </span>
-      </button>`;
+      </div>`;
   }).join('');
   $('#grid').html(html);
-  $('#grid-empty').toggleClass('d-none', lista.length > 0 || productos.length === 0);
+  $('#grid-empty').toggleClass('d-none', res.length > 0 || productos.length === 0);
 
   if (productos.length === 0) {
     $('#resultado-info').html('No hay productos en el inventario. <a href="{% url "crear_inventario" %}">Agrega el primero</a>.');
   } else {
-    const extra = lista.length > MAX_CARDS ? ` (mostrando ${MAX_CARDS}, afina la búsqueda)` : '';
-    $('#resultado-info').text(`${lista.length} producto${lista.length === 1 ? '' : 's'}${extra}`);
+    const extra = res.length > MAX_CARDS ? ` (mostrando ${MAX_CARDS}, afina la búsqueda)` : '';
+    $('#resultado-info').text(`${res.length} prenda${res.length === 1 ? '' : 's'}${extra}`);
   }
 }
 
@@ -479,12 +602,18 @@ $buscador.on('keydown', function (e) {
     e.preventDefault();
     const q = this.value.trim();
     if (!q) { if (carrito.length) abrirCobro(); return; }
+    // 1) código de barras exacto (lector) → se agrega directo
     const exacto = productos.find(p => p.codigo === q);
-    const lista = filtrar();
     if (exacto) agregar(exacto.id);
-    else if (lista.length === 1) agregar(lista[0].id);
-    else if (lista.length === 0) { App.toast(`No se encontró “${q}”`, 'error'); }
-    else { App.toast('Hay varios resultados, elige uno de la lista', 'info'); return; }
+    else {
+      // 2) búsqueda: se agrega solo si queda una única opción clara (con stock)
+      const res = filtrar();
+      const opciones = res.flatMap(r => r.familia.variantes.filter(v => v.stock > 0 && (!r.tallaPedida || r.coinciden.has(v.id))));
+      if (!res.length) { App.toast(`No se encontró “${q}”`, 'error'); }
+      else if (opciones.length === 1) agregar(opciones[0].id);
+      else if (res.length === 1) { App.toast('Elige la talla en la tarjeta', 'info'); return; }
+      else { App.toast('Hay varios resultados: elige uno o agrega la talla a la búsqueda (ej. "pantalon 10")', 'info'); return; }
+    }
     this.value = '';
     renderGrid();
   } else if (e.key === 'Escape') {
@@ -493,17 +622,21 @@ $buscador.on('keydown', function (e) {
   }
 });
 
-$('#chips').on('click', '.chip', function () {
-  colegioActivo = $(this).data('colegio');
-  renderChips();
-  renderGrid();
-  $buscador.focus();
-});
+$('#chips-colegio').on('click', '.chip', function () { colegioActivo = String($(this).data('colegio')); prendaActiva = ''; tallaActiva = ''; renderChips(); renderGrid(); $buscador.focus(); });
+$('#chips-prenda').on('click', '.chip', function () { prendaActiva = String($(this).data('prenda')); tallaActiva = ''; renderChips(); renderGrid(); $buscador.focus(); });
+$('#chips-talla').on('click', '.chip', function () { tallaActiva = String($(this).data('talla')); renderChips(); renderGrid(); $buscador.focus(); });
 
-$('#grid').on('click', '.product-card', function () {
+$('#grid').on('click', '.size:not(:disabled)', function () {
   agregar(Number($(this).data('id')));
   $buscador.focus();
 });
+
+// Al terminar una venta los filtros vuelven a "Todos" (durante la venta el colegio elegido se mantiene)
+function reiniciarFiltros() { colegioActivo = ''; prendaActiva = ''; tallaActiva = ''; renderChips(); }
+
+// Si se crean productos o conjuntos mientras el POS está abierto, se cargan al volver a esta ventana
+let ultimaCarga = 0;
+$(window).on('focus', () => { if (Date.now() - ultimaCarga > 15000 && !$('.modal.show').length) cargarProductos(); });
 
 $('#ticket-items')
   .on('click', '.js-mas', function () { const id = +$(this).closest('.ticket-item').data('id'); const c = carrito.find(x => x.id === id); setCantidad(id, c.cantidad + 1); })
@@ -612,6 +745,7 @@ $('#btn-confirmar').on('click', function () {
     graciasCliente = { total: totalServidor, recibido, vuelto: ultimaVenta.vuelto, metodo: App.METODOS_PAGO[metodo].nombre };
     carrito = [];
     $buscador.val('');
+    reiniciarFiltros();
     renderTicket();
     modalCobro.hide();
     $('#exito-num').text(res.venta_id ? `Boleta N° ${res.venta_id}` : '');
