@@ -486,9 +486,9 @@ def sistema_salud(request):
 def sistema_buscar_actualizacion(request):
     try:
         return JsonResponse({'status': 'success', **sistema.buscar_actualizacion()})
-    except Exception:
+    except Exception as e:
         logger.warning('No se pudo buscar actualizaciones', exc_info=True)
-        return JsonResponse({'status': 'error', 'message': 'No se pudo revisar si hay actualizaciones. ¿Hay conexión a internet?'}, status=503)
+        return JsonResponse({'status': 'error', 'message': sistema.explicar_error(e)}, status=503)
 
 
 @require_POST
@@ -497,9 +497,9 @@ def sistema_actualizar(request):
         info = sistema.descargar_e_instalar()
     except RuntimeError as e:
         return _error(str(e))
-    except Exception:
+    except Exception as e:
         logger.exception('Falló la actualización')
-        return JsonResponse({'status': 'error', 'message': 'No se pudo descargar la actualización. Revisa la conexión e intenta nuevamente.'}, status=503)
+        return JsonResponse({'status': 'error', 'message': sistema.explicar_error(e)}, status=503)
     return JsonResponse({'status': 'success', 'version': info['version']})
 
 

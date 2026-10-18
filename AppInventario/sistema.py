@@ -2,7 +2,9 @@
 import hashlib
 import json
 import os
+import socket
 import sqlite3
+import ssl
 import subprocess
 import threading
 import urllib.error
@@ -77,9 +79,39 @@ def _version_tupla(v):
     return tuple(partes + [0] * (3 - len(partes)))
 
 
+def _contexto_ssl():
+    """Certificados de Windows + los de certifi: un Windows recién instalado puede no tener
+    aún el certificado raíz de GitHub (el navegador lo descarga solo; Python no)."""
+    ctx = ssl.create_default_context()
+    try:
+        import certifi
+        ctx.load_verify_locations(certifi.where())
+    except Exception:
+        pass
+    return ctx
+
+
 def _get(url, timeout=10):
     req = urllib.request.Request(url, headers={'User-Agent': USER_AGENT, 'Accept': 'application/vnd.github+json'})
-    return urllib.request.urlopen(req, timeout=timeout)
+    return urllib.request.urlopen(req, timeout=timeout, context=_contexto_ssl())
+
+
+def explicar_error(exc):
+    """Mensaje entendible según la causa real del problema de conexión."""
+    texto = str(exc)
+    if isinstance(exc, urllib.error.HTTPError):
+        if exc.code in (403, 429):
+            return 'GitHub limitó las consultas por un rato. Intenta nuevamente en una hora.'
+        return f'GitHub respondió con un error ({exc.code}). Intenta más tarde.'
+    if 'CERTIFICATE_VERIFY_FAILED' in texto or isinstance(getattr(exc, 'reason', None), ssl.SSLError) or isinstance(exc, ssl.SSLError):
+        if 'not yet valid' in texto or 'expired' in texto:
+            return 'La fecha u hora del equipo parece incorrecta. Corrígela en la configuración de Windows e intenta de nuevo.'
+        return 'No se pudo verificar la conexión segura con GitHub (certificado). Revisa la fecha y hora del equipo.'
+    if isinstance(exc, (TimeoutError, socket.timeout)) or 'timed out' in texto:
+        return 'La conexión tardó demasiado. Revisa el internet e intenta de nuevo.'
+    if isinstance(exc, urllib.error.URLError):
+        return f'No hay conexión con GitHub ({getattr(exc, "reason", texto)}). Revisa el internet o el firewall.'
+    return f'No se pudo revisar si hay actualizaciones ({type(exc).__name__}: {texto[:120]}).'
 
 
 def buscar_actualizacion():
