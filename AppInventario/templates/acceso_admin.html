@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block title %}Sección protegida{% endblock %}
+{% block page_title %}Sección protegida{% endblock %}
+{% block page_subtitle %}Las ventas y montos solo los ve quien tiene la clave de administrador{% endblock %}
+
+{% block content %}
+<div class="form-shell" style="max-width:460px">
+  <div class="panel">
+    <form method="post" action="{% url 'abrir_acceso' %}">
+      {% csrf_token %}
+      <input type="hidden" name="siguiente" value="{{ siguiente }}">
+      <div class="panel-body text-center p-4 pb-3">
+        <div class="mx-auto mb-3 d-grid" style="width:56px;height:56px;border-radius:16px;place-items:center;background:var(--primary-50);color:var(--primary);font-size:24px">
+          <i class="bi bi-lock-fill"></i>
+        </div>
+        <h2 class="h5 fw-bold mb-2">Ingresa la clave de administrador</h2>
+        <p class="text-secondary mb-0">El historial de ventas, las boletas y el análisis quedan abiertos mientras estés en ellos. Al ir a otra sección, presionar «Bloquear vista de ventas» o pasar 10 minutos sin usarlos, se vuelven a cerrar.</p>
+      </div>
+      <div class="px-4 pb-3">
+        <label class="form-label" for="clave"><i class="bi bi-shield-lock me-1"></i>Clave de administrador</label>
+        <input type="password" name="clave" id="clave" class="form-control" autocomplete="off" required autofocus>
+        {% if error %}<div class="field-error">{{ error }}</div>{% endif %}
+      </div>
+      <div class="modal-footer justify-content-between">
+        <a href="{% url 'punto_de_venta' %}" class="btn btn-light-border">Volver al punto de venta</a>
+        <button type="submit" class="btn btn-primary"><i class="bi bi-unlock me-1"></i>Entrar</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

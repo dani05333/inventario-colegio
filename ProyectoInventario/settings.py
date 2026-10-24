@@ -79,6 +79,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'AppInventario.middleware.CerrarAccesoAlSalir',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 

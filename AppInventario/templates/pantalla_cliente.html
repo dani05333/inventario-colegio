@@ -97,7 +97,8 @@
     .slide { position: absolute; inset: 0; opacity: 0; transition: opacity 1.2s ease; overflow: hidden; }
     .slide.on { opacity: 1; }
     .slide .fondo { position: absolute; inset: -6%; background-size: cover; background-position: center; filter: blur(40px) brightness(.55) saturate(1.2); transform: scale(1.1); }
-    .slide img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 2vmin; }
+    .slide img, .slide video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 2vmin; }
+    .slide.es-video { background: #000; }
   </style>
 </head>
 <body>
@@ -157,9 +158,11 @@
   const canal = 'BroadcastChannel' in window ? new BroadcastChannel('pos-pantalla-cliente') : null;
   let timerGracias = null;
 
-  /* ---------- Presentación de imágenes ---------- */
-  let pres = { activa: false, segundos: 5, imagenes: [] };
-  let presTimer = null, presIndice = 0, enReposo = true;
+  /* ---------- Presentación de imágenes y videos ----------
+     En orden: cada imagen se ve los segundos elegidos y cada video se reproduce completo (sin sonido);
+     al terminar pasa al siguiente y, después del último, vuelve al primero. */
+  let pres = { activa: false, segundos: 5, items: [] };
+  let presTimer = null, presIndice = 0, presCorriendo = false, enReposo = true;
 
   function cargarPresentacion() {
     return fetch("{% url 'presentacion_datos' %}", { cache: 'no-store' })
@@ -168,8 +171,9 @@
         const cambio = JSON.stringify(d) !== JSON.stringify(pres);
         pres = d;
         if (!cambio) return;
-        document.getElementById('v-presentacion').innerHTML = pres.imagenes.map(url => `
-          <div class="slide"><div class="fondo" style="background-image:url('${url}')"></div><img src="${url}" alt=""></div>`).join('');
+        document.getElementById('v-presentacion').innerHTML = pres.items.map(i => i.video
+          ? `<div class="slide es-video"><video src="${i.url}" muted playsinline preload="metadata"></video></div>`
+          : `<div class="slide"><div class="fondo" style="background-image:url('${i.url}')"></div><img src="${i.url}" alt=""></div>`).join('');
         presIndice = 0;
         detenerPresentacion();
         if (enReposo) mostrarReposo();
@@ -177,21 +181,43 @@
       .catch(() => {});
   }
 
-  function detenerPresentacion() { clearInterval(presTimer); presTimer = null; }
-
-  function pasarImagen() {
-    const slides = document.querySelectorAll('#v-presentacion .slide');
-    if (!slides.length) return;
-    slides.forEach((s, i) => s.classList.toggle('on', i === presIndice % slides.length));
-    presIndice = (presIndice + 1) % slides.length;
+  function detenerPresentacion() {
+    clearTimeout(presTimer);
+    presTimer = null;
+    presCorriendo = false;
+    document.querySelectorAll('#v-presentacion video').forEach(v => v.pause());
   }
 
-  // Sin venta en curso: presentación si está activa y hay imágenes; si no, la bienvenida
+  function mostrarElemento(indice) {
+    const slides = [...document.querySelectorAll('#v-presentacion .slide')];
+    if (!slides.length) return;
+    presIndice = indice % slides.length;
+    clearTimeout(presTimer);
+    slides.forEach((s, i) => {
+      s.classList.toggle('on', i === presIndice);
+      const v = s.querySelector('video');
+      if (v && i !== presIndice) v.pause();
+    });
+    const video = slides[presIndice].querySelector('video');
+    // Solo avanza si la presentación sigue en pantalla (al empezar una venta se detiene)
+    const siguiente = () => { if (presCorriendo) mostrarElemento(presIndice + 1); };
+    if (video) {
+      video.loop = slides.length === 1;            // si es lo único, se repite solo
+      video.onended = siguiente;
+      video.onerror = () => { presTimer = setTimeout(siguiente, 1000); };   // video dañado: se salta
+      video.currentTime = 0;
+      video.play().catch(() => { presTimer = setTimeout(siguiente, pres.segundos * 1000); });
+    } else if (slides.length > 1) {
+      presTimer = setTimeout(siguiente, pres.segundos * 1000);
+    }
+  }
+
+  // Sin venta en curso: presentación si está activa y tiene imágenes o videos; si no, la bienvenida
   function mostrarReposo() {
     enReposo = true;
-    if (pres.activa && pres.imagenes.length) {
+    if (pres.activa && pres.items.length) {
       mostrar('v-presentacion');
-      if (!presTimer) { pasarImagen(); presTimer = setInterval(pasarImagen, pres.segundos * 1000); }
+      if (!presCorriendo) { presCorriendo = true; mostrarElemento(presIndice); }
     } else {
       mostrar('v-bienvenida');
     }

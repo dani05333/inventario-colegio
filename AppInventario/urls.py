@@ -1,4 +1,5 @@
 from django.urls import path
+from django.views.generic import RedirectView
 from . import views
 
 urlpatterns = [
@@ -65,7 +66,10 @@ urlpatterns = [
     path('api/sistema/respaldar/', views.sistema_respaldar, name='sistema_respaldar'),
     path('api/generar-codigo/', views.generar_codigo, name='generar_codigo'),
     path('api/asignar-codigos/', views.asignar_codigos, name='asignar_codigos'),
-    path('', views.dashboard_ventas, name='dashboard_ventas'),
+    path('', RedirectView.as_view(pattern_name='punto_de_venta'), name='portada'),   # el programa abre en el punto de venta
+    path('analisis/', views.dashboard_ventas, name='dashboard_ventas'),
+    path('acceso/abrir/', views.abrir_acceso, name='abrir_acceso'),
+    path('acceso/cerrar/', views.cerrar_acceso, name='cerrar_acceso'),
     path('api/ventas-data/', views.ventas_data, name='ventas_data'),
     path('api/historial-ventas/', views.historial_ventas_json, name='historial_ventas_json'),
     path('api/stock_bajo/', views.stock_bajo, name='stock_bajo'),

@@ -1,4 +1,5 @@
-"""Clave de administrador: se pide para anular o borrar ventas y para eliminar registros."""
+"""Clave de administrador: se pide para anular o borrar ventas, para eliminar registros y para ver
+cuánto se ha vendido (historial, boletas y análisis)."""
 import threading
 import time
 
@@ -56,6 +57,39 @@ def cambiar(nueva, actual=None):
     if len(nueva) < LARGO_MINIMO:
         raise ClaveError(f'La clave debe tener al menos {LARGO_MINIMO} caracteres.')
     Configuracion.objects.update_or_create(clave=CLAVE_CONFIG, defaults={'valor': make_password(nueva)})
+
+
+# ---------------------------------------------------------------------------
+# Acceso a las secciones con montos de venta: al ingresar la clave quedan abiertas en este
+# navegador hasta que se va a otra sección (middleware.CerrarAccesoAlSalir), se presiona
+# «Bloquear» o pasan MINUTOS_ACCESO sin usarlas.
+# ---------------------------------------------------------------------------
+
+SESION_ACCESO = 'admin_acceso_hasta'
+MINUTOS_ACCESO = 10
+
+
+def acceso_admin(request):
+    """True si se puede ver la información de ventas (también si aún no se crea la clave)."""
+    if not tiene_clave():
+        return True
+    return request.session.get(SESION_ACCESO, 0) > time.time()
+
+
+def renovar_acceso(request):
+    if tiene_clave():
+        request.session[SESION_ACCESO] = time.time() + MINUTOS_ACCESO * 60
+
+
+def abrir_acceso(request, clave):
+    """Lanza ClaveError si la clave no es válida."""
+    verificar(clave)
+    request.session.cycle_key()
+    renovar_acceso(request)
+
+
+def cerrar_acceso(request):
+    request.session.pop(SESION_ACCESO, None)
 
 
 def restablecer():

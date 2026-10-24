@@ -1,4 +1,7 @@
-"""Presentación de imágenes en la pantalla del cliente mientras no hay una venta en curso."""
+"""Presentación de imágenes y videos en la pantalla del cliente mientras no hay una venta en curso.
+
+Se muestran en el orden en que se agregaron: cada imagen por los segundos elegidos y cada video
+completo, sin sonido."""
 import re
 import shutil
 import time
@@ -8,13 +11,29 @@ from django.conf import settings
 
 from .models import Configuracion
 
-EXTENSIONES = {'.jpg', '.jpeg', '.png', '.webp'}
+IMAGENES = {'.jpg', '.jpeg', '.png', '.webp'}
+VIDEOS = {'.mp4', '.webm'}
+EXTENSIONES = IMAGENES | VIDEOS
 MAX_MB = 10
+MAX_MB_VIDEO = 300
 SEGUNDOS_OPCIONES = (3, 5, 8, 10, 15, 20)
 INICIALES = Path(__file__).resolve().parent / 'presentacion_inicial'
 
-# Firmas de archivo: evita que se suba algo que no sea realmente una imagen
+# Firmas de archivo: evita que se suba algo que no sea realmente una imagen o un video
 FIRMAS = (b'\xff\xd8\xff', b'\x89PNG\r\n\x1a\n', b'RIFF')
+FIRMA_WEBM = b'\x1a\x45\xdf\xa3'
+
+
+def es_video(nombre):
+    return Path(nombre).suffix.lower() in VIDEOS
+
+
+def _firma_valida(inicio, ext):
+    if ext == '.mp4':
+        return inicio[4:8] == b'ftyp'
+    if ext == '.webm':
+        return inicio.startswith(FIRMA_WEBM)
+    return inicio.startswith(FIRMAS)
 
 
 def carpeta():
@@ -29,7 +48,8 @@ def carpeta():
     return destino
 
 
-def imagenes():
+def archivos():
+    """Imágenes y videos, en el orden en que se agregaron (el nombre empieza con la hora de subida)."""
     return sorted(f.name for f in carpeta().iterdir() if f.is_file() and f.suffix.lower() in EXTENSIONES)
 
 
@@ -68,18 +88,22 @@ def ruta_segura(nombre):
 
 
 def guardar_subida(archivo):
-    """Guarda una imagen subida (UploadedFile). Devuelve el nombre o lanza ValueError."""
+    """Guarda una imagen o video subido (UploadedFile). Devuelve el nombre o lanza ValueError."""
     ext = Path(archivo.name).suffix.lower()
     if ext not in EXTENSIONES:
-        raise ValueError(f'«{archivo.name}» no es una imagen JPG, PNG o WEBP.')
-    if archivo.size > MAX_MB * 1024 * 1024:
-        raise ValueError(f'«{archivo.name}» pesa más de {MAX_MB} MB.')
+        raise ValueError(f'«{archivo.name}» no es una imagen JPG, PNG o WEBP ni un video MP4 o WEBM.')
+    video = ext in VIDEOS
+    limite = MAX_MB_VIDEO if video else MAX_MB
+    if archivo.size > limite * 1024 * 1024:
+        raise ValueError(f'«{archivo.name}» pesa más de {limite} MB.')
     inicio = archivo.read(12)
     archivo.seek(0)
-    if not inicio.startswith(FIRMAS):
-        raise ValueError(f'«{archivo.name}» no parece ser una imagen válida.')
-    base = re.sub(r'[^a-zA-Z0-9_-]+', '-', Path(archivo.name).stem).strip('-').lower()[:40] or 'imagen'
-    nombre = f"{int(time.time())}-{base}{'.jpg' if ext == '.jpeg' else ext}"
+    if not _firma_valida(inicio, ext):
+        raise ValueError(f'«{archivo.name}» no parece ser {"un video" if video else "una imagen"} válido.')
+    base = re.sub(r'[^a-zA-Z0-9_-]+', '-', Path(archivo.name).stem).strip('-').lower()[:40] or ('video' if video else 'imagen')
+    # El nombre empieza con la hora de subida en microsegundos: así varios archivos subidos juntos
+    # quedan en el orden en que se eligieron (con segundos quedaban en orden alfabético)
+    nombre = f"{time.time_ns() // 1000}-{base}{'.jpg' if ext == '.jpeg' else ext}"
     with open(carpeta() / nombre, 'wb') as f:
         for trozo in archivo.chunks():
             f.write(trozo)
@@ -89,5 +113,5 @@ def guardar_subida(archivo):
 def eliminar(nombre):
     ruta = ruta_segura(nombre)
     if ruta is None:
-        raise ValueError('La imagen no existe.')
+        raise ValueError('El archivo no existe.')
     ruta.unlink()

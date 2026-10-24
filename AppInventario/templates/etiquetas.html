@@ -29,6 +29,13 @@
     background: var(--warning-50); color: var(--warning); border-radius: 12px; padding: 12px 16px; margin-bottom: 16px;
   }
   .banner .grow { flex: 1; min-width: 200px; }
+  /* Etiquetas en rollo de boletas: una debajo de otra, con línea punteada para cortar. La impresora térmica
+     solo imprime negro, así que el texto va en negrita y sin grises */
+  .update-box-imp { background: var(--primary-50); color: var(--text); border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+  .lbl-fila { margin: 0 auto; break-inside: avoid; }
+  .lbl-fila + .lbl-fila { border-top: .4mm dashed #000; }
+  .lbl-fila .lbl { color: #000; }
+  .lbl-fila .lbl-sub { font-weight: 700; }
 </style>
 {% endblock %}
 
@@ -112,6 +119,7 @@
           <i class="bi bi-info-circle"></i> En la ventana de impresión usa <strong>márgenes: ninguno</strong> y <strong>escala 100 %</strong>.
           Para rollo térmico, elige la impresora de etiquetas y el mismo tamaño de papel.
         </div>
+        <div class="update-box-imp d-none mt-2" id="imp-etiquetas"></div>
       </div>
     </div>
   </div>
@@ -123,6 +131,8 @@
 <script>
 /* Medidas en milímetros */
 const FORMATOS = {
+  // continuo = ancho del rollo de una impresora de boletas: las etiquetas salen una debajo de otra, con línea de corte
+  'boleta80-1':  { nombre: 'Rollo de boletas 80 mm · una por fila (68 × 35 mm)', w: 68, h: 35, continuo: 80, ayuda: 'Para la impresora de 80 mm con papel de boleta: salen una debajo de otra, con una línea punteada para cortarlas.' },
   'rollo-50x25': { nombre: 'Rollo térmico 50 × 25 mm', w: 50, h: 25, ayuda: 'Una etiqueta por página. El tamaño más común en impresoras térmicas.' },
   'rollo-40x30': { nombre: 'Rollo térmico 40 × 30 mm', w: 40, h: 30, ayuda: 'Una etiqueta por página.' },
   'rollo-60x40': { nombre: 'Rollo térmico 60 × 40 mm', w: 60, h: 40, ayuda: 'Una etiqueta por página. Más espacio para el texto.' },
@@ -229,6 +239,12 @@ function totalEtiquetas() {
 function actualizar() {
   const f = FORMATOS[$('#formato').val()];
   $('#formato-ayuda').text(f.ayuda);
+  // El navegador recuerda la última impresora usada (puede ser la de boletas): se recuerda cuál elegir
+  $('#imp-etiquetas').addClass('d-none');
+  if (f.continuo) App.nombreImpresora(f.continuo).then(n => {
+    if (n && FORMATOS[$('#formato').val()] === f)
+      $('#imp-etiquetas').html(`<i class="bi bi-printer me-1"></i>En la ventana de impresión elige <strong>${App.esc(n)}</strong>`).removeClass('d-none');
+  });
   $('#opt-inicio').toggleClass('d-none', !f.hoja);
 
   const ejemplo = productos.find(p => seleccion.has(p.id)) || productos.find(p => App.codigoValido(p.codigo))
@@ -251,14 +267,20 @@ function actualizar() {
 }
 
 /* ---------- Impresión ---------- */
-function imprimir() {
+async function imprimir() {
   const f = FORMATOS[$('#formato').val()];
   const items = [];
   productos.forEach(p => { const q = seleccion.get(p.id); for (let i = 0; i < (q || 0); i++) items.push(p); });
   if (!items.length) return;
+  if (f.continuo && !(await App.verificarImpresora({ ancho: f.continuo, uso: 'etiquetas' }))) return;
 
   let html, pageCss;
-  if (!f.hoja) {
+  if (f.continuo) {
+    // Sin tamaño de hoja: se usa el papel del driver (rollo largo), con las etiquetas una debajo de otra desde arriba.
+    // Si se pidiera un tamaño de hoja que el driver no tiene, el navegador achicaría todo y lo centraría en el rollo.
+    html = items.map(p => `<div class="lbl-fila" style="width:${f.w}mm">${etiquetaHtml(p, f)}</div>`).join('');
+    pageCss = '@page { margin: 0; } #print-area { padding: 2mm 0; }';
+  } else if (!f.hoja) {
     html = items.map(p => `<div style="width:${f.w}mm;height:${f.h}mm;break-after:page;overflow:hidden">${etiquetaHtml(p, f)}</div>`).join('');
     pageCss = `@page { size: ${f.w}mm ${f.h}mm; margin: 0; }`;
   } else {

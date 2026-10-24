@@ -16,7 +16,8 @@
   .ruta { font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; word-break: break-all; }
   .pr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
   .pr-item { position: relative; aspect-ratio: 4 / 3; border-radius: 12px; overflow: hidden; background: #111; border: 1px solid var(--border); }
-  .pr-item img { width: 100%; height: 100%; object-fit: contain; }
+  .pr-item img, .pr-item video { width: 100%; height: 100%; object-fit: contain; }
+  .pr-video { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 44px; height: 44px; border-radius: 50%; background: rgba(0, 0, 0, .55); color: #fff; display: grid; place-items: center; font-size: 26px; pointer-events: none; }
   .pr-num { position: absolute; left: 8px; top: 8px; background: rgba(0, 0, 0, .6); color: #fff; font-size: 12px; font-weight: 700; border-radius: 999px; min-width: 22px; height: 22px; display: grid; place-items: center; padding: 0 6px; }
   .pr-del { position: absolute; right: 8px; top: 8px; width: 28px; height: 28px; border-radius: 50%; border: 0; background: rgba(255, 255, 255, .92); color: var(--danger); display: grid; place-items: center; }
   .pr-del:hover { background: #fff; box-shadow: 0 2px 8px rgba(0, 0, 0, .3); }
@@ -86,7 +87,7 @@
   <div class="panel-header flex-wrap">
     <div>
       <h2 class="panel-title"><i class="bi bi-images me-1"></i>Presentación en la pantalla del cliente</h2>
-      <p class="panel-sub">Mientras no se está vendiendo, la pantalla del cliente muestra estas imágenes una tras otra</p>
+      <p class="panel-sub">Mientras no se está vendiendo, la pantalla del cliente muestra estas imágenes y videos uno tras otro</p>
     </div>
     <div class="form-check form-switch m-0 d-flex align-items-center gap-2">
       <input class="form-check-input m-0" type="checkbox" role="switch" id="pr-activa" {% if presentacion.activa %}checked{% endif %} style="width:2.6em;height:1.4em">
@@ -102,23 +103,30 @@
         </select>
       </div>
       <div>
-        <input type="file" id="pr-archivos" accept=".jpg,.jpeg,.png,.webp" multiple class="d-none">
-        <button class="btn btn-soft" id="pr-subir"><i class="bi bi-upload me-1"></i>Agregar imágenes</button>
+        <input type="file" id="pr-archivos" accept=".jpg,.jpeg,.png,.webp,.mp4,.webm" multiple class="d-none">
+        <button class="btn btn-soft" id="pr-subir"><i class="bi bi-upload me-1"></i>Agregar imágenes o videos</button>
       </div>
       <a href="{% url 'pantalla_cliente' %}" target="_blank" class="btn btn-light-border"><i class="bi bi-display me-1"></i>Ver pantalla del cliente</a>
     </div>
     <div class="pr-grid" id="pr-grid">
-      {% for nombre in presentacion_imagenes %}
-      <div class="pr-item" data-nombre="{{ nombre }}">
-        <img src="{% url 'presentacion_imagen' nombre %}" alt="" loading="lazy">
+      {% for item in presentacion_items %}
+      <div class="pr-item" data-nombre="{{ item.nombre }}">
+        {% if item.video %}
+        <video src="{% url 'presentacion_imagen' item.nombre %}#t=1" muted preload="metadata"></video>
+        <span class="pr-video" title="Video"><i class="bi bi-play-fill"></i></span>
+        {% else %}
+        <img src="{% url 'presentacion_imagen' item.nombre %}" alt="" loading="lazy">
+        {% endif %}
         <span class="pr-num">{{ forloop.counter }}</span>
-        <button class="pr-del" title="Quitar imagen"><i class="bi bi-x-lg"></i></button>
+        <button class="pr-del" title="Quitar de la presentación"><i class="bi bi-x-lg"></i></button>
       </div>
       {% empty %}
-      <div class="empty py-4" style="grid-column:1/-1"><i class="bi bi-images"></i><strong>No hay imágenes</strong>Mientras no haya imágenes se muestra la pantalla de bienvenida.</div>
+      <div class="empty py-4" style="grid-column:1/-1"><i class="bi bi-images"></i><strong>No hay imágenes ni videos</strong>Mientras no haya nada se muestra la pantalla de bienvenida.</div>
       {% endfor %}
     </div>
-    <div class="field-help mt-2">JPG, PNG o WEBP de hasta 10 MB. Se muestran completas, en el orden en que se agregaron. Quitar una imagen pide la clave de administrador.</div>
+    <div class="field-help mt-2">Imágenes JPG, PNG o WEBP de hasta {{ presentacion_max_mb.0 }} MB y videos MP4 o WEBM de hasta {{ presentacion_max_mb.1 }} MB.
+      Se muestran en el orden en que se agregaron: cada imagen por el tiempo elegido y cada video completo, sin sonido.
+      Quitar uno pide la clave de administrador.</div>
   </div>
 </div>
 
@@ -126,7 +134,7 @@
 <div class="modal fade" id="modalClaveImg" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-sm">
     <div class="modal-content">
-      <div class="modal-header"><h5 class="modal-title">Quitar imagen</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div>
+      <div class="modal-header"><h5 class="modal-title">Quitar de la presentación</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div>
       <div class="modal-body">
         <img id="ci-preview" src="" alt="" class="w-100 rounded-3 mb-3" style="max-height:140px;object-fit:contain;background:var(--surface-2)">
         <label class="form-label" for="ci-clave"><i class="bi bi-shield-lock me-1"></i>Clave de administrador</label>
@@ -140,19 +148,19 @@
   </div>
 </div>
 
-<!-- Impresora de boletas -->
+<!-- Impresoras térmicas: boletas (58 mm) y etiquetas (80 mm) -->
 <div class="panel mt-4" style="max-width:1100px" id="impresora">
   <div class="panel-header">
     <div>
-      <h2 class="panel-title"><i class="bi bi-printer me-1"></i>Impresora de boletas</h2>
-      <p class="panel-sub">La boleta se ajusta al ancho del rollo de papel de la impresora térmica</p>
+      <h2 class="panel-title"><i class="bi bi-printer me-1"></i>Impresoras térmicas</h2>
+      <p class="panel-sub">La de boletas y la de etiquetas (rollo de 80 mm). La boleta se ajusta al ancho de su rollo</p>
     </div>
   </div>
   <div class="panel-body">
-    <div id="imp-estado" class="update-box mt-0 mb-3"><span class="spinner-border spinner-border-sm me-2"></span>Buscando la impresora de boletas…</div>
+    <div id="imp-estado" class="update-box mt-0 mb-3"><span class="spinner-border spinner-border-sm me-2"></span>Buscando las impresoras térmicas…</div>
     <div class="d-flex flex-wrap gap-3 align-items-end">
       <div>
-        <label class="form-label" for="bo-ancho">Ancho del rollo de papel</label>
+        <label class="form-label" for="bo-ancho">Rollo de la impresora de boletas</label>
         <select class="form-select" id="bo-ancho" style="width:auto">
           {% for a in boleta_anchos %}<option value="{{ a }}" {% if a == BOLETA_ANCHO %}selected{% endif %}>{{ a }} mm{% if a == 58 %} (rollo angosto, ~5,5 cm){% else %} (rollo ancho, ~8 cm){% endif %}</option>{% endfor %}
         </select>
@@ -160,7 +168,8 @@
       <button class="btn btn-soft" id="bo-prueba"><i class="bi bi-receipt me-1"></i>Imprimir boleta de prueba</button>
       <button class="btn btn-light-border" id="imp-revisar"><i class="bi bi-arrow-clockwise me-1"></i>Volver a revisar</button>
     </div>
-    <div class="field-help mt-2">En la ventana de impresión elige la impresora de boletas, con márgenes «Ninguno» y escala 100 %. El navegador recuerda la última impresora elegida.</div>
+    <div class="field-help mt-2">En la ventana de impresión elige la impresora que corresponde (boletas o etiquetas), con márgenes «Ninguno» y escala 100 %.
+      El navegador recuerda la última impresora elegida: al pasar de etiquetas a boletas, revisa que esté elegida la correcta.</div>
   </div>
 </div>
 
@@ -354,38 +363,38 @@ $('#bo-ancho').on('change', function () {
     setTimeout(() => { location.hash = 'impresora'; location.reload(); }, 800);
   }).fail(() => App.toast('No se pudo guardar', 'error'));
 });
-function btnDriver(texto, clase) {
-  return `<button class="btn ${clase} btn-sm mt-2" id="imp-driver"><i class="bi bi-download me-1"></i>${texto}</button>`;
+const USO_ANCHO = { 58: 'boletas', 80: 'etiquetas' };
+function btnDriver(ancho, clase) {
+  return `<button class="btn ${clase} btn-sm mt-2 me-2 js-driver" data-ancho="${ancho}"><i class="bi bi-download me-1"></i>Instalar driver de ${ancho} mm (${USO_ANCHO[ancho]})</button>`;
 }
 function revisarImpresora() {
-  $('#imp-estado').attr('class', 'update-box mt-0 mb-3').html('<span class="spinner-border spinner-border-sm me-2"></span>Buscando la impresora de boletas…');
+  $('#imp-estado').attr('class', 'update-box mt-0 mb-3').html('<span class="spinner-border spinner-border-sm me-2"></span>Buscando las impresoras térmicas…');
   App.estadoImpresora(true).then(r => {
     if (!r) throw new Error();
-    const otras = r.otras.length ? `<div class="small text-secondary mt-1">Otras impresoras: ${r.otras.map(App.esc).join(', ')}</div>` : '';
-    if (r.boletas.length) {
-      const nombres = r.boletas.map(i => `<strong>${App.esc(i.nombre)}</strong>`).join(' o ');
-      $('#imp-estado').attr('class', 'update-box ok mt-0 mb-3').html(
-        `<i class="bi bi-check-circle-fill me-1"></i>Impresora de boletas instalada: ${nombres}.
-         <div class="small mt-1">Al imprimir, elige ese nombre en la ventana de impresión.${r.conectada ? '' : ' <strong>Ahora no está conectada o está apagada.</strong>'}</div>
-         ${otras}${r.driver_disponible ? btnDriver('Reinstalar driver', 'btn-light-border') : ''}`);
-    } else {
-      $('#imp-estado').attr('class', 'update-box error mt-0 mb-3').html(
-        (r.conectada
-          ? '<i class="bi bi-exclamation-triangle-fill me-1"></i>La impresora de boletas está <strong>conectada, pero falta instalar su driver</strong>.'
-          : '<i class="bi bi-exclamation-triangle-fill me-1"></i>No se encontró la impresora de boletas. Revisa que esté <strong>encendida y conectada por USB</strong>; si es primera vez, instala su driver.')
-        + otras
-        + (r.driver_disponible ? '<div class="small mt-2">Se abrirá el instalador del fabricante: Windows pedirá permiso; acepta y sigue los pasos. Al terminar, presiona «Volver a revisar».</div>' + btnDriver('Instalar driver', 'btn-primary')
-                               : '<div class="small mt-2">El driver se instala desde el programa instalado en el POS.</div>'));
-    }
-  }).catch(() => $('#imp-estado').attr('class', 'update-box error mt-0 mb-3').text('No se pudo revisar la impresora.'));
+    const otras = r.otras.length ? `<div class="small text-secondary mt-2">Otras impresoras: ${r.otras.map(App.esc).join(', ')}</div>` : '';
+    const lista = r.boletas.map(i => `<li><strong>${App.esc(i.nombre)}</strong>${i.ancho ? ` · rollo de ${i.ancho} mm, para ${USO_ANCHO[i.ancho]}` : ''}</li>`).join('');
+    const faltan = [58, 80].filter(a => !r.boletas.some(i => i.ancho === a));
+    const aviso = r.sin_driver
+      ? '<div class="mt-2"><i class="bi bi-exclamation-triangle-fill me-1"></i>Hay una impresora térmica <strong>conectada, pero le falta su driver</strong>. Instala el que corresponda a su rollo:</div>'
+      : (faltan.length ? `<div class="mt-2 small">Falta la de ${faltan.map(a => `${USO_ANCHO[a]} (${a} mm)`).join(' y ')}. Si es primera vez, conéctala, enciéndela e instala su driver.</div>` : '');
+    const botones = r.driver_disponible
+      ? (r.sin_driver || faltan.length ? '<div class="small mt-2">Se abrirá el instalador del fabricante: Windows pedirá permiso; acepta y sigue los pasos. Al terminar, presiona «Volver a revisar».</div>' : '')
+        + (faltan.length ? faltan : [58, 80]).map(a => btnDriver(a, r.sin_driver || faltan.length ? 'btn-primary' : 'btn-light-border')).join('')
+      : '<div class="small mt-2">Los drivers se instalan desde el programa instalado en el POS.</div>';
+    const ok = r.boletas.length && !r.sin_driver;
+    $('#imp-estado').attr('class', `update-box ${ok && !faltan.length ? 'ok' : 'error'} mt-0 mb-3`).html(
+      (r.boletas.length ? `<div><i class="bi bi-check-circle-fill me-1"></i>Impresoras térmicas instaladas (elige su nombre en la ventana de impresión):</div><ul class="mb-0 mt-1">${lista}</ul>`
+                        : '<div><i class="bi bi-exclamation-triangle-fill me-1"></i>No hay impresoras térmicas instaladas.</div>')
+      + aviso + otras + botones);
+  }).catch(() => $('#imp-estado').attr('class', 'update-box error mt-0 mb-3').text('No se pudo revisar las impresoras.'));
 }
 $('#imp-revisar').on('click', revisarImpresora);
-$('#imp-estado').on('click', '#imp-driver', function () {
+$('#imp-estado').on('click', '.js-driver', function () {
   const btn = $(this).prop('disabled', true);
-  $.ajax({ url: "{% url 'impresora_instalar_driver' %}", method: 'POST', headers: { 'X-CSRFToken': CSRF } })
-    .done(() => App.toast('Se abrió el instalador del driver. Sigue sus pasos y luego presiona «Volver a revisar».', 'info', 8000))
-    .fail(xhr => App.toast((xhr.responseJSON && xhr.responseJSON.message) || 'No se pudo abrir el instalador', 'error', 6000))
-    .always(() => btn.prop('disabled', false));
+  App.instalarDriver(Number(btn.data('ancho')))
+    .then(() => App.toast('Se abrió el instalador del driver. Sigue sus pasos y luego presiona «Volver a revisar».', 'info', 8000))
+    .catch(err => App.toast(err.message, 'error', 6000))
+    .finally(() => btn.prop('disabled', false));
 });
 revisarImpresora();
 
@@ -420,16 +429,23 @@ $('#pr-archivos').on('change', function () {
   const datos = new FormData();
   [...this.files].forEach(f => datos.append('imagenes', f));
   const btn = $('#pr-subir').prop('disabled', true).html('<span class="spinner-border spinner-border-sm me-2"></span>Subiendo…');
-  $.ajax({ url: "{% url 'presentacion_subir' %}", method: 'POST', headers: { 'X-CSRFToken': CSRF }, data: datos, processData: false, contentType: false })
+  $.ajax({
+    url: "{% url 'presentacion_subir' %}", method: 'POST', headers: { 'X-CSRFToken': CSRF }, data: datos, processData: false, contentType: false,
+    xhr: () => {   // los videos pesan: se muestra cuánto va
+      const xhr = $.ajaxSettings.xhr();
+      xhr.upload.onprogress = e => { if (e.lengthComputable) btn.html(`<span class="spinner-border spinner-border-sm me-2"></span>Subiendo… ${Math.round(e.loaded / e.total * 100)} %`); };
+      return xhr;
+    }
+  })
     .done(r => {
       (r.errores || []).forEach(e => App.toast(e, 'warning', 6000));
-      App.toast(`${r.guardadas.length} imagen${r.guardadas.length === 1 ? '' : 'es'} agregada${r.guardadas.length === 1 ? '' : 's'}`, 'success');
+      App.toast(`${r.guardadas.length} archivo${r.guardadas.length === 1 ? '' : 's'} agregado${r.guardadas.length === 1 ? '' : 's'} a la presentación`, 'success');
       avisarPantalla();
       setTimeout(() => { location.hash = 'presentacion'; location.reload(); }, 1000);
     })
     .fail(xhr => {
-      ((xhr.responseJSON && xhr.responseJSON.errores) || ['No se pudieron subir las imágenes']).forEach(e => App.toast(e, 'error', 6000));
-      btn.prop('disabled', false).html('<i class="bi bi-upload me-1"></i>Agregar imágenes');
+      ((xhr.responseJSON && xhr.responseJSON.errores) || [(xhr.responseJSON && xhr.responseJSON.message) || 'No se pudieron subir los archivos']).forEach(e => App.toast(e, 'error', 6000));
+      btn.prop('disabled', false).html('<i class="bi bi-upload me-1"></i>Agregar imágenes o videos');
     });
   this.value = '';
 });
@@ -439,7 +455,8 @@ let imagenQuitar = null;
 $('#pr-grid').on('click', '.pr-del', function () {
   const item = $(this).closest('.pr-item');
   imagenQuitar = item.data('nombre');
-  $('#ci-preview').attr('src', item.find('img').attr('src'));
+  const img = item.find('img');
+  $('#ci-preview').attr('src', img.length ? img.attr('src') : '').toggleClass('d-none', !img.length);   // los videos no tienen vista previa aquí
   $('#ci-clave').val('');
   modalClaveImg.show();
 });
@@ -455,7 +472,7 @@ $('#ci-confirmar').on('click', function () {
     modalClaveImg.hide();
     $(`.pr-item[data-nombre="${CSS.escape(imagenQuitar)}"]`).remove();
     $('#pr-grid .pr-num').each((i, el) => $(el).text(i + 1));
-    App.toast('Imagen quitada de la presentación', 'success');
+    App.toast('Quitado de la presentación', 'success');
     avisarPantalla();
   }).fail(xhr => {
     App.toast((xhr.responseJSON && xhr.responseJSON.message) || 'No se pudo quitar', 'error', 5000);

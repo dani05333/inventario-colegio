@@ -26,7 +26,7 @@
 <body>
 {% with n=request.resolver_match.url_name %}
   <aside class="app-sidebar">
-    <a href="{% url 'dashboard_ventas' %}" class="brand" title="Chloe Creaciones">
+    <a href="{% url 'punto_de_venta' %}" class="brand" title="Chloe Creaciones">
       <span class="brand-logo">CC</span>
       <span class="brand-text">
         <span class="brand-name d-block">Chloe Creaciones</span>
@@ -38,8 +38,15 @@
       <div class="nav-section"><span>Ventas</span></div>
       <ul class="side-nav">
         <li><a href="{% url 'punto_de_venta' %}" title="Punto de venta" class="{% if n == 'punto_de_venta' %}active{% endif %}"><i class="bi bi-upc-scan"></i><span>Punto de venta</span></a></li>
-        <li><a href="{% url 'historial_ventas' %}" title="Historial de ventas" class="{% if n == 'historial_ventas' or n == 'boleta' %}active{% endif %}"><i class="bi bi-receipt"></i><span>Historial de ventas</span></a></li>
-        <li><a href="{% url 'dashboard_ventas' %}" title="Análisis" class="{% if n == 'dashboard_ventas' %}active{% endif %}"><i class="bi bi-graph-up-arrow"></i><span>Análisis</span></a></li>
+        <li><a href="{% url 'historial_ventas' %}" title="Historial de ventas" class="{% if n == 'historial_ventas' or n == 'boleta' %}active{% endif %}"><i class="bi bi-receipt"></i><span>Historial de ventas{% if not ACCESO_ADMIN %} <i class="bi bi-lock-fill nav-candado" title="Pide la clave de administrador"></i>{% endif %}</span></a></li>
+        <li><a href="{% url 'dashboard_ventas' %}" title="Análisis" class="{% if n == 'dashboard_ventas' %}active{% endif %}"><i class="bi bi-graph-up-arrow"></i><span>Análisis{% if not ACCESO_ADMIN %} <i class="bi bi-lock-fill nav-candado" title="Pide la clave de administrador"></i>{% endif %}</span></a></li>
+        {% if ACCESO_ADMIN and TIENE_CLAVE %}
+        <li>
+          <form method="post" action="{% url 'cerrar_acceso' %}" class="m-0">{% csrf_token %}
+            <button type="submit" class="nav-bloquear" title="Bloquear historial, boletas y análisis"><i class="bi bi-lock"></i><span>Bloquear vista de ventas</span></button>
+          </form>
+        </li>
+        {% endif %}
       </ul>
 
       <div class="nav-section"><span>Stock</span></div>
@@ -87,6 +94,13 @@
     </header>
 
     <main class="app-content {% block content_class %}{% endblock %}">
+      {% if not TIENE_CLAVE and request.resolver_match.url_name in 'historial_ventas boleta dashboard_ventas' %}
+      <div class="alert alert-warning d-flex align-items-center gap-2 mb-3">
+        <i class="bi bi-unlock-fill"></i>
+        <div>Esta sección muestra montos de venta y está <strong>abierta para cualquiera</strong>: crea una clave de administrador
+          en <a href="{% url 'sistema' %}#clave">Sistema → Clave de administrador</a> para protegerla.</div>
+      </div>
+      {% endif %}
       {% block content %}{% endblock %}
     </main>
   </div>

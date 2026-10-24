@@ -212,13 +212,19 @@ const App = (function () {
     return impPendiente;
   }
 
-  function instalarDriver() {
-    return fetch(IMP.instalar, { method: 'POST', headers: { 'X-CSRFToken': IMP.csrf } })
+  function instalarDriver(ancho) {
+    return fetch(IMP.instalar, { method: 'POST', headers: { 'X-CSRFToken': IMP.csrf, 'Content-Type': 'application/json' }, body: JSON.stringify({ ancho }) })
       .then(r => r.json().then(d => { if (!r.ok) throw new Error(d.message || 'No se pudo abrir el instalador'); }));
   }
 
-  /* Ventana de aviso cuando no hay impresora de boletas. Resuelve true = imprimir igual, false = cancelar */
-  function avisoSinImpresora(estado) {
+  /* Impresoras térmicas instaladas que sirven para el ancho de rollo pedido (las de ancho desconocido sirven para todo) */
+  function termicasPara(estado, ancho) {
+    return estado.boletas.filter(i => !ancho || !i.ancho || i.ancho === ancho);
+  }
+
+  /* Ventana de aviso cuando no está la impresora térmica que se necesita. Resuelve true = imprimir igual, false = cancelar */
+  function avisoSinImpresora(estado, { ancho, uso }) {
+    const titulo = `Impresora de ${uso} (rollo de ${ancho} mm)`;
     return new Promise(resolve => {
       const el = document.createElement('div');
       el.className = 'modal fade';
@@ -226,13 +232,13 @@ const App = (function () {
       el.innerHTML = `
         <div class="modal-dialog modal-dialog-centered">
           <div class="modal-content">
-            <div class="modal-header"><h5 class="modal-title"><i class="bi bi-printer me-2"></i>Impresora de boletas</h5>
+            <div class="modal-header"><h5 class="modal-title"><i class="bi bi-printer me-2"></i>${esc(titulo)}</h5>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div>
             <div class="modal-body"></div>
             <div class="modal-footer">
               <button type="button" class="btn btn-light-border me-auto" data-acc="igual">Imprimir de todas formas</button>
               <button type="button" class="btn btn-light-border" data-acc="revisar"><i class="bi bi-arrow-clockwise me-1"></i>Volver a revisar</button>
-              <button type="button" class="btn btn-primary" data-acc="instalar"><i class="bi bi-download me-1"></i>Instalar driver</button>
+              <button type="button" class="btn btn-primary" data-acc="instalar"><i class="bi bi-download me-1"></i>Instalar driver de ${ancho} mm</button>
             </div>
           </div>
         </div>`;
@@ -240,12 +246,12 @@ const App = (function () {
       const cuerpo = el.querySelector('.modal-body');
       const btnInstalar = el.querySelector('[data-acc="instalar"]');
       const pintar = (e, nota = '') => {
-        cuerpo.innerHTML = (e.conectada
-          ? '<p class="mb-2"><strong>La impresora de boletas está conectada, pero falta instalar su driver.</strong></p>'
-          : '<p class="mb-2"><strong>No se encontró la impresora de boletas.</strong> Revisa que esté encendida y conectada por USB.</p>')
+        cuerpo.innerHTML = (e.sin_driver
+          ? `<p class="mb-2"><strong>Hay una impresora térmica conectada, pero le falta su driver.</strong></p>`
+          : `<p class="mb-2"><strong>No se encontró la impresora de ${esc(uso)} de ${ancho} mm.</strong> Revisa que esté encendida y conectada por USB.</p>`)
           + (e.driver_disponible
             ? '<p class="mb-0 small text-secondary">«Instalar driver» abre el instalador del fabricante: Windows pedirá permiso; acepta y sigue los pasos. Al terminar, presiona «Volver a revisar».</p>'
-            : '<p class="mb-0 small text-secondary">El driver se instala desde el programa instalado en el POS (Sistema → Impresora de boletas).</p>')
+            : '<p class="mb-0 small text-secondary">El driver se instala desde el programa instalado en el POS (Sistema → Impresoras térmicas).</p>')
           + nota;
         btnInstalar.classList.toggle('d-none', !e.driver_disponible);
       };
@@ -260,17 +266,18 @@ const App = (function () {
         btn.disabled = true;
         if (acc === 'instalar') {
           try {
-            await instalarDriver();
+            await instalarDriver(ancho);
             pintar(estado, '<div class="alert alert-info small mt-3 mb-0">Se abrió el instalador. Cuando termine, presiona «Volver a revisar».</div>');
           } catch (err) { toast(err.message, 'error', 6000); }
         } else {
           const nuevo = await estadoImpresora(true);
-          if (nuevo && nuevo.boletas.length) {
-            toast(`Impresora de boletas lista: ${nuevo.boletas[0].nombre}`, 'success', 5000);
+          const lista = nuevo ? termicasPara(nuevo, ancho) : [];
+          if (lista.length) {
+            toast(`Impresora lista: ${lista[0].nombre}. Elígela en la ventana de impresión.`, 'success', 6000);
             resultado = true; modal.hide(); return;
           }
           if (nuevo) estado = nuevo;
-          pintar(estado, '<div class="alert alert-warning small mt-3 mb-0">Todavía no aparece la impresora de boletas.</div>');
+          pintar(estado, `<div class="alert alert-warning small mt-3 mb-0">Todavía no aparece la impresora de ${esc(uso)}.</div>`);
         }
         btn.disabled = false;
       });
@@ -279,9 +286,24 @@ const App = (function () {
     });
   }
 
-  async function printReceipt(venta) {
+  /* Antes de imprimir: revisa que esté instalada la impresora térmica del ancho pedido; si no, avisa.
+     Resuelve true = seguir imprimiendo, false = cancelar */
+  async function verificarImpresora({ ancho, uso }) {
     const estado = await estadoImpresora();
-    if (estado && !estado.boletas.length && !(await avisoSinImpresora(estado))) return;
+    if (!estado || termicasPara(estado, ancho).length) return true;
+    return avisoSinImpresora(estado, { ancho, uso });
+  }
+
+  /* Nombre de la impresora térmica para ese ancho de rollo (para recordar cuál elegir en la ventana de impresión) */
+  async function nombreImpresora(ancho = ANCHO_ROLLO) {
+    const estado = await estadoImpresora();
+    if (!estado) return null;
+    const exacta = estado.boletas.find(i => i.ancho === ancho);
+    return (exacta || termicasPara(estado, ancho)[0] || {}).nombre || null;
+  }
+
+  async function printReceipt(venta) {
+    if (!(await verificarImpresora({ ancho: ANCHO_ROLLO, uso: 'boletas' }))) return;
     imprimirBoleta(venta);
   }
 
@@ -367,7 +389,7 @@ const App = (function () {
 
   return {
     money, num, esc, toast, formatDateTime, dtLanguage, loadScript, METODOS_PAGO,
-    receiptHtml, printReceipt, downloadReceipt, estadoImpresora, armarConjuntos, lineasBoleta,
+    receiptHtml, printReceipt, downloadReceipt, estadoImpresora, verificarImpresora, instalarDriver, nombreImpresora, armarConjuntos, lineasBoleta,
     JSBARCODE_URL, renderBarcode, esEan13, codigoValido
   };
 })();

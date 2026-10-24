@@ -1,6 +1,9 @@
 import json
 import logging
+import mimetypes
+import re
 from collections import defaultdict
+from functools import wraps
 from datetime import datetime, time, timedelta
 from decimal import Decimal
 
@@ -8,11 +11,12 @@ from django.conf import settings
 from django.core.paginator import Paginator
 from django.db import models, transaction
 from django.db.models import F, ProtectedError, Q, Sum
-from django.http import FileResponse, Http404, JsonResponse
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.dateparse import parse_date
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_POST
 from django.views.generic.edit import CreateView, DeleteView, UpdateView
 
@@ -25,6 +29,43 @@ logger = logging.getLogger(__name__)
 
 def inicio(request):
     return render(request, 'inicio.html')
+
+
+# ---------------------------------------------------------------------------
+# Secciones con montos de venta (historial, boletas, análisis): solo con la clave de administrador
+# ---------------------------------------------------------------------------
+
+def requiere_admin(vista):
+    @wraps(vista)
+    def envuelta(request, *args, **kwargs):
+        if seguridad.acceso_admin(request):
+            seguridad.renovar_acceso(request)
+            respuesta = vista(request, *args, **kwargs)
+            # Que el botón «Atrás» no muestre una copia guardada cuando el acceso ya se cerró
+            respuesta['Cache-Control'] = 'no-store'
+            return respuesta
+        if request.path.startswith('/api/'):
+            return JsonResponse({'status': 'error', 'message': 'Ingresa la clave de administrador para ver esta información.'}, status=403)
+        return render(request, 'acceso_admin.html', {'siguiente': request.get_full_path()}, status=403)
+    return envuelta
+
+
+@require_POST
+def abrir_acceso(request):
+    siguiente = request.POST.get('siguiente') or ''
+    if not url_has_allowed_host_and_scheme(siguiente, allowed_hosts={request.get_host()}):
+        siguiente = reverse('punto_de_venta')
+    try:
+        seguridad.abrir_acceso(request, request.POST.get('clave'))
+    except seguridad.ClaveError as e:
+        return render(request, 'acceso_admin.html', {'siguiente': siguiente, 'error': str(e)}, status=403)
+    return redirect(siguiente)
+
+
+@require_POST
+def cerrar_acceso(request):
+    seguridad.cerrar_acceso(request)
+    return redirect('punto_de_venta')
 
 
 # ---------------------------------------------------------------------------
@@ -494,6 +535,7 @@ def _ventas_con_detalle():
     )
 
 
+@requiere_admin
 def historial_ventas(request):
     ventas = _ventas_con_detalle().order_by('-fecha')
     return render(request, 'historial_ventas.html', {'ventas_data': [_venta_dict(v) for v in ventas]})
@@ -531,6 +573,7 @@ def anular_venta(request, pk):
     return JsonResponse({'status': 'success', 'venta': _venta_dict(venta)})
 
 
+@requiere_admin
 def boleta(request, pk):
     venta = get_object_or_404(_ventas_con_detalle(), pk=pk)
     anterior = Venta.objects.filter(pk__lt=pk).order_by('-pk').values_list('pk', flat=True).first()
@@ -555,7 +598,8 @@ def ver_sistema(request):
         'total_ventas': Venta.objects.count(),
         'ventas_anuladas': Venta.objects.filter(anulada=True).count(),
         'presentacion': presentacion.ajustes(),
-        'presentacion_imagenes': presentacion.imagenes(),
+        'presentacion_items': [{'nombre': n, 'video': presentacion.es_video(n)} for n in presentacion.archivos()],
+        'presentacion_max_mb': (presentacion.MAX_MB, presentacion.MAX_MB_VIDEO),
         'segundos_opciones': presentacion.SEGUNDOS_OPCIONES,
         'boleta_anchos': impresora.ANCHOS,
     })
@@ -579,7 +623,10 @@ def impresora_estado(request):
 @require_POST
 def impresora_instalar_driver(request):
     try:
-        impresora.instalar_driver()
+        ancho = json.loads(request.body or '{}').get('ancho')   # 58 / 80; sin ancho = el de la boleta
+        impresora.instalar_driver(int(ancho) if ancho else None)
+    except (TypeError, json.JSONDecodeError):
+        return _error('Ancho de rollo no válido.')
     except (ValueError, OSError) as e:
         return _error(str(e) if isinstance(e, ValueError) else 'No se pudo abrir el instalador del driver.')
     return JsonResponse({'status': 'success'})
@@ -593,16 +640,42 @@ def impresora_instalar_driver(request):
 def presentacion_datos(request):
     return JsonResponse({
         **presentacion.ajustes(),
-        'imagenes': [reverse('presentacion_imagen', args=[n]) for n in presentacion.imagenes()],
+        'items': [{'url': reverse('presentacion_imagen', args=[n]), 'video': presentacion.es_video(n)}
+                  for n in presentacion.archivos()],
     })
+
+
+TROZO_VIDEO = 4 * 1024 * 1024   # bytes por respuesta cuando el navegador pide un video por partes
 
 
 @require_GET
 def presentacion_imagen(request, nombre):
+    """Imagen o video de la presentación. Los videos se entregan por partes (Range), como los pide
+    el navegador para reproducirlos sin cargarlos enteros."""
     ruta = presentacion.ruta_segura(nombre)
     if ruta is None:
         raise Http404
-    respuesta = FileResponse(open(ruta, 'rb'))
+    tipo = mimetypes.guess_type(ruta.name)[0] or 'application/octet-stream'
+    rango = re.fullmatch(r'bytes=(\d*)-(\d*)', request.headers.get('Range', '').strip())
+    if not rango or not (rango.group(1) or rango.group(2)):
+        respuesta = FileResponse(open(ruta, 'rb'), content_type=tipo)
+    else:
+        tamano = ruta.stat().st_size
+        if rango.group(1):
+            inicio = int(rango.group(1))
+            fin = int(rango.group(2)) if rango.group(2) else tamano - 1
+        else:   # «bytes=-N»: los últimos N bytes
+            inicio, fin = max(0, tamano - int(rango.group(2))), tamano - 1
+        fin = min(fin, tamano - 1, inicio + TROZO_VIDEO - 1)
+        if inicio > fin:
+            respuesta = HttpResponse(status=416)
+            respuesta['Content-Range'] = f'bytes */{tamano}'
+            return respuesta
+        with open(ruta, 'rb') as f:
+            f.seek(inicio)
+            respuesta = HttpResponse(f.read(fin - inicio + 1), status=206, content_type=tipo)
+        respuesta['Content-Range'] = f'bytes {inicio}-{fin}/{tamano}'
+    respuesta['Accept-Ranges'] = 'bytes'
     respuesta['Cache-Control'] = 'max-age=86400'
     return respuesta
 
@@ -621,7 +694,7 @@ def presentacion_config(request):
 def presentacion_subir(request):
     archivos = request.FILES.getlist('imagenes')
     if not archivos:
-        return _error('Elige al menos una imagen.')
+        return _error('Elige al menos una imagen o video.')
     guardadas, errores = [], []
     for archivo in archivos:
         try:
@@ -740,6 +813,7 @@ def sistema_respaldar(request):
 # Análisis
 # ---------------------------------------------------------------------------
 
+@requiere_admin
 def dashboard_ventas(request):
     return render(request, 'dashboard.html')
 
@@ -749,6 +823,7 @@ def _inicio_del_dia(fecha):
     return timezone.make_aware(datetime.combine(fecha, time.min))
 
 
+@requiere_admin
 def ventas_data(request):
     rango = request.GET.get('rango', 'dia')
     fecha_inicio = parse_date(request.GET.get('inicio') or '')
@@ -815,6 +890,7 @@ def ventas_data(request):
     })
 
 
+@requiere_admin
 def historial_ventas_json(request):
     draw = int(request.GET.get('draw', 1))
     start = int(request.GET.get('start', 0))
@@ -876,6 +952,7 @@ def stock_bajo(request):
     return JsonResponse({'productos': productos})
 
 
+@requiere_admin
 def productos_tendencia(request):
     hoy = timezone.localdate()
     fin = _inicio_del_dia(hoy + timedelta(days=1))
