@@ -794,6 +794,7 @@ $('#btn-confirmar').on('click', function () {
 $('#modalExito').on('shown.bs.modal', () => $('#btn-nueva-venta').focus());
 $('#btn-nueva-venta').on('click', () => { modalExito.hide(); $buscador.focus(); });
 $('#btn-imprimir').on('click', () => { if (ultimaVenta) App.printReceipt(ultimaVenta); });
+App.estadoImpresora();   // se revisa al abrir, para que al imprimir no haya que esperar
 $('#btn-pdf').on('click', async function () {
   if (!ultimaVenta) return;
   const btn = $(this).prop('disabled', true);

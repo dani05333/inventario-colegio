@@ -435,6 +435,12 @@ table.dataTable > thead .sorting_asc:before, table.dataTable > thead .sorting_de
   body > *:not(#print-area) { display: none !important; }
   #print-area { display: block !important; }
   @page { margin: 6mm; }
+  /* La impresora térmica solo imprime negro: letra gruesa y sin grises para que se lea bien */
+  #print-area .receipt { font-weight: 700; color: #000; }
+  #print-area .receipt small { font-size: 1em; }
+  #print-area .receipt hr { border-top-width: 2px; }
+  #print-area .receipt h3,
+  #print-area .receipt .total { font-size: 17px; font-weight: 800; }
 }
 
 /* ---------- Etiquetas ---------- */

@@ -359,7 +359,8 @@ function btnDriver(texto, clase) {
 }
 function revisarImpresora() {
   $('#imp-estado').attr('class', 'update-box mt-0 mb-3').html('<span class="spinner-border spinner-border-sm me-2"></span>Buscando la impresora de boletas…');
-  $.getJSON("{% url 'impresora_estado' %}").done(r => {
+  App.estadoImpresora(true).then(r => {
+    if (!r) throw new Error();
     const otras = r.otras.length ? `<div class="small text-secondary mt-1">Otras impresoras: ${r.otras.map(App.esc).join(', ')}</div>` : '';
     if (r.boletas.length) {
       const nombres = r.boletas.map(i => `<strong>${App.esc(i.nombre)}</strong>`).join(' o ');
@@ -376,7 +377,7 @@ function revisarImpresora() {
         + (r.driver_disponible ? '<div class="small mt-2">Se abrirá el instalador del fabricante: Windows pedirá permiso; acepta y sigue los pasos. Al terminar, presiona «Volver a revisar».</div>' + btnDriver('Instalar driver', 'btn-primary')
                                : '<div class="small mt-2">El driver se instala desde el programa instalado en el POS.</div>'));
     }
-  }).fail(() => $('#imp-estado').attr('class', 'update-box error mt-0 mb-3').text('No se pudo revisar la impresora.'));
+  }).catch(() => $('#imp-estado').attr('class', 'update-box error mt-0 mb-3').text('No se pudo revisar la impresora.'));
 }
 $('#imp-revisar').on('click', revisarImpresora);
 $('#imp-estado').on('click', '#imp-driver', function () {

@@ -68,8 +68,7 @@ def copiar_drivers():
             urllib.request.urlretrieve(url, archivo)
         if hashlib.sha256(archivo.read_bytes()).hexdigest() != sha256:
             archivo.unlink()
-            sys.exit(f'
-El driver {nombre} descargado no coincide con el esperado. Revisa la carpeta Drive del fabricante.')
+            sys.exit(f'\nEl driver {nombre} descargado no coincide con el esperado. Revisa la carpeta Drive del fabricante.')
         shutil.copy2(archivo, destino / nombre)
 
 

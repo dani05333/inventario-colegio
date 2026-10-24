@@ -51,8 +51,9 @@ const App = (function () {
   };
 
   /* Rollo de la impresora de boletas (se elige en Sistema → Impresora de boletas).
-     util = ancho que la impresora alcanza a imprimir, en mm */
-  const ROLLOS = { 58: { util: 48, letra: 11 }, 80: { util: 72, letra: 12 } };
+     util = ancho de la boleta, en mm: lo que la impresora alcanza a imprimir (48 / 72 mm) menos 2 mm por lado,
+     para que nada quede cortado en el borde */
+  const ROLLOS = { 58: { util: 44, letra: 12 }, 80: { util: 68, letra: 13 } };
   const ANCHO_ROLLO = ROLLOS[window.APP_BOLETA_ANCHO] ? window.APP_BOLETA_ANCHO : 58;
   const ROLLO = ROLLOS[ANCHO_ROLLO];
 
@@ -188,24 +189,109 @@ const App = (function () {
       </div>`;
   }
 
-  /* Alto de la boleta en mm, midiéndola fuera de la pantalla */
-  function altoBoletaMm(venta) {
-    const holder = document.createElement('div');
-    holder.style.cssText = 'position:fixed;left:-10000px;top:0;background:#fff';
-    holder.innerHTML = receiptHtml(venta);
-    document.body.appendChild(holder);
-    const alto = Math.ceil(holder.offsetHeight * 25.4 / 96);
-    holder.remove();
-    return alto;
+  /* ---------- Impresora de boletas ----------
+     Antes de imprimir se revisa que Windows tenga una impresora de boletas; si no, se avisa y se ofrece
+     instalar el driver. La revisión tarda unos segundos, así que se recuerda por 10 minutos. */
+  const IMP = window.APP_IMPRESORA || null;
+  const IMP_CACHE = 'chloe-impresora';
+  let impPendiente = null;
+
+  function estadoImpresora(forzar = false) {
+    if (!IMP) return Promise.resolve(null);
+    if (!forzar) {
+      try {
+        const c = JSON.parse(sessionStorage.getItem(IMP_CACHE));
+        if (c && Date.now() - c.t < 10 * 60 * 1000) return Promise.resolve(c.estado);
+      } catch (e) { /* sin caché */ }
+      if (impPendiente) return impPendiente;
+    }
+    impPendiente = fetch(IMP.estado).then(r => r.ok ? r.json() : null).then(estado => {
+      try { if (estado) sessionStorage.setItem(IMP_CACHE, JSON.stringify({ t: Date.now(), estado })); } catch (e) { /* sin caché */ }
+      return estado;
+    }).catch(() => null).finally(() => { impPendiente = null; });
+    return impPendiente;
   }
 
-  function printReceipt(venta) {
-    // La "hoja" se pide del ancho del rollo y del alto justo de la boleta; si no, el navegador
-    // manda una hoja carta/A4 y la impresora de rollo se queda pegada o bota papel en blanco
-    const alto = altoBoletaMm(venta) + 12;
+  function instalarDriver() {
+    return fetch(IMP.instalar, { method: 'POST', headers: { 'X-CSRFToken': IMP.csrf } })
+      .then(r => r.json().then(d => { if (!r.ok) throw new Error(d.message || 'No se pudo abrir el instalador'); }));
+  }
+
+  /* Ventana de aviso cuando no hay impresora de boletas. Resuelve true = imprimir igual, false = cancelar */
+  function avisoSinImpresora(estado) {
+    return new Promise(resolve => {
+      const el = document.createElement('div');
+      el.className = 'modal fade';
+      el.tabIndex = -1;
+      el.innerHTML = `
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title"><i class="bi bi-printer me-2"></i>Impresora de boletas</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div>
+            <div class="modal-body"></div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-light-border me-auto" data-acc="igual">Imprimir de todas formas</button>
+              <button type="button" class="btn btn-light-border" data-acc="revisar"><i class="bi bi-arrow-clockwise me-1"></i>Volver a revisar</button>
+              <button type="button" class="btn btn-primary" data-acc="instalar"><i class="bi bi-download me-1"></i>Instalar driver</button>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(el);
+      const cuerpo = el.querySelector('.modal-body');
+      const btnInstalar = el.querySelector('[data-acc="instalar"]');
+      const pintar = (e, nota = '') => {
+        cuerpo.innerHTML = (e.conectada
+          ? '<p class="mb-2"><strong>La impresora de boletas está conectada, pero falta instalar su driver.</strong></p>'
+          : '<p class="mb-2"><strong>No se encontró la impresora de boletas.</strong> Revisa que esté encendida y conectada por USB.</p>')
+          + (e.driver_disponible
+            ? '<p class="mb-0 small text-secondary">«Instalar driver» abre el instalador del fabricante: Windows pedirá permiso; acepta y sigue los pasos. Al terminar, presiona «Volver a revisar».</p>'
+            : '<p class="mb-0 small text-secondary">El driver se instala desde el programa instalado en el POS (Sistema → Impresora de boletas).</p>')
+          + nota;
+        btnInstalar.classList.toggle('d-none', !e.driver_disponible);
+      };
+      pintar(estado);
+      let resultado = false;
+      const modal = new bootstrap.Modal(el);
+      el.addEventListener('click', async ev => {
+        const btn = ev.target.closest('[data-acc]');
+        if (!btn) return;
+        const acc = btn.dataset.acc;
+        if (acc === 'igual') { resultado = true; modal.hide(); return; }
+        btn.disabled = true;
+        if (acc === 'instalar') {
+          try {
+            await instalarDriver();
+            pintar(estado, '<div class="alert alert-info small mt-3 mb-0">Se abrió el instalador. Cuando termine, presiona «Volver a revisar».</div>');
+          } catch (err) { toast(err.message, 'error', 6000); }
+        } else {
+          const nuevo = await estadoImpresora(true);
+          if (nuevo && nuevo.boletas.length) {
+            toast(`Impresora de boletas lista: ${nuevo.boletas[0].nombre}`, 'success', 5000);
+            resultado = true; modal.hide(); return;
+          }
+          if (nuevo) estado = nuevo;
+          pintar(estado, '<div class="alert alert-warning small mt-3 mb-0">Todavía no aparece la impresora de boletas.</div>');
+        }
+        btn.disabled = false;
+      });
+      el.addEventListener('hidden.bs.modal', () => { el.remove(); resolve(resultado); });
+      modal.show();
+    });
+  }
+
+  async function printReceipt(venta) {
+    const estado = await estadoImpresora();
+    if (estado && !estado.boletas.length && !(await avisoSinImpresora(estado))) return;
+    imprimirBoleta(venta);
+  }
+
+  function imprimirBoleta(venta) {
+    // Sin tamaño de hoja: se usa el papel del driver (rollo de 48 mm imprimibles x 1 m), con la boleta
+    // arriba y sin márgenes. Si se pide un tamaño que el driver no tiene, el navegador achica la
+    // boleta y la centra en ese metro de papel.
     let st = document.getElementById('receipt-page-css');
     if (!st) { st = document.createElement('style'); st.id = 'receipt-page-css'; document.head.appendChild(st); }
-    st.textContent = `@media print { @page { size: ${ANCHO_ROLLO}mm ${alto}mm; margin: 0; } #print-area { padding: 3mm 0; } }`;
+    st.textContent = '@media print { @page { margin: 0; } #print-area { padding: 2mm 0; } }';
     document.getElementById('print-area').innerHTML = receiptHtml(venta);
     window.print();
   }
@@ -281,7 +367,7 @@ const App = (function () {
 
   return {
     money, num, esc, toast, formatDateTime, dtLanguage, loadScript, METODOS_PAGO,
-    receiptHtml, printReceipt, downloadReceipt, armarConjuntos, lineasBoleta,
+    receiptHtml, printReceipt, downloadReceipt, estadoImpresora, armarConjuntos, lineasBoleta,
     JSBARCODE_URL, renderBarcode, esEan13, codigoValido
   };
 })();
