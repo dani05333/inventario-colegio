@@ -149,6 +149,7 @@
     </div>
   </div>
   <div class="panel-body">
+    <div id="imp-estado" class="update-box mt-0 mb-3"><span class="spinner-border spinner-border-sm me-2"></span>Buscando la impresora de boletas…</div>
     <div class="d-flex flex-wrap gap-3 align-items-end">
       <div>
         <label class="form-label" for="bo-ancho">Ancho del rollo de papel</label>
@@ -157,8 +158,9 @@
         </select>
       </div>
       <button class="btn btn-soft" id="bo-prueba"><i class="bi bi-receipt me-1"></i>Imprimir boleta de prueba</button>
+      <button class="btn btn-light-border" id="imp-revisar"><i class="bi bi-arrow-clockwise me-1"></i>Volver a revisar</button>
     </div>
-    <div class="field-help mt-2">En la ventana de impresión elige la impresora de boletas, con márgenes «Ninguno» y escala 100 %.</div>
+    <div class="field-help mt-2">En la ventana de impresión elige la impresora de boletas, con márgenes «Ninguno» y escala 100 %. El navegador recuerda la última impresora elegida.</div>
   </div>
 </div>
 
@@ -352,6 +354,40 @@ $('#bo-ancho').on('change', function () {
     setTimeout(() => { location.hash = 'impresora'; location.reload(); }, 800);
   }).fail(() => App.toast('No se pudo guardar', 'error'));
 });
+function btnDriver(texto, clase) {
+  return `<button class="btn ${clase} btn-sm mt-2" id="imp-driver"><i class="bi bi-download me-1"></i>${texto}</button>`;
+}
+function revisarImpresora() {
+  $('#imp-estado').attr('class', 'update-box mt-0 mb-3').html('<span class="spinner-border spinner-border-sm me-2"></span>Buscando la impresora de boletas…');
+  $.getJSON("{% url 'impresora_estado' %}").done(r => {
+    const otras = r.otras.length ? `<div class="small text-secondary mt-1">Otras impresoras: ${r.otras.map(App.esc).join(', ')}</div>` : '';
+    if (r.boletas.length) {
+      const nombres = r.boletas.map(i => `<strong>${App.esc(i.nombre)}</strong>`).join(' o ');
+      $('#imp-estado').attr('class', 'update-box ok mt-0 mb-3').html(
+        `<i class="bi bi-check-circle-fill me-1"></i>Impresora de boletas instalada: ${nombres}.
+         <div class="small mt-1">Al imprimir, elige ese nombre en la ventana de impresión.${r.conectada ? '' : ' <strong>Ahora no está conectada o está apagada.</strong>'}</div>
+         ${otras}${r.driver_disponible ? btnDriver('Reinstalar driver', 'btn-light-border') : ''}`);
+    } else {
+      $('#imp-estado').attr('class', 'update-box error mt-0 mb-3').html(
+        (r.conectada
+          ? '<i class="bi bi-exclamation-triangle-fill me-1"></i>La impresora de boletas está <strong>conectada, pero falta instalar su driver</strong>.'
+          : '<i class="bi bi-exclamation-triangle-fill me-1"></i>No se encontró la impresora de boletas. Revisa que esté <strong>encendida y conectada por USB</strong>; si es primera vez, instala su driver.')
+        + otras
+        + (r.driver_disponible ? '<div class="small mt-2">Se abrirá el instalador del fabricante: Windows pedirá permiso; acepta y sigue los pasos. Al terminar, presiona «Volver a revisar».</div>' + btnDriver('Instalar driver', 'btn-primary')
+                               : '<div class="small mt-2">El driver se instala desde el programa instalado en el POS.</div>'));
+    }
+  }).fail(() => $('#imp-estado').attr('class', 'update-box error mt-0 mb-3').text('No se pudo revisar la impresora.'));
+}
+$('#imp-revisar').on('click', revisarImpresora);
+$('#imp-estado').on('click', '#imp-driver', function () {
+  const btn = $(this).prop('disabled', true);
+  $.ajax({ url: "{% url 'impresora_instalar_driver' %}", method: 'POST', headers: { 'X-CSRFToken': CSRF } })
+    .done(() => App.toast('Se abrió el instalador del driver. Sigue sus pasos y luego presiona «Volver a revisar».', 'info', 8000))
+    .fail(xhr => App.toast((xhr.responseJSON && xhr.responseJSON.message) || 'No se pudo abrir el instalador', 'error', 6000))
+    .always(() => btn.prop('disabled', false));
+});
+revisarImpresora();
+
 $('#bo-prueba').on('click', () => App.printReceipt({
   id: 'PRUEBA', fecha: new Date(), total: 22000, recibido: 25000, vuelto: 3000,
   items: [

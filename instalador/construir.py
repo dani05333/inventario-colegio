@@ -25,6 +25,13 @@ from pathlib import Path
 PYTHON_VERSION = '3.13.16'
 PY_TAG = '313'
 
+# Drivers de la impresora de boletas (de la carpeta Drive del fabricante, ver LEEME.md).
+# El SHA-256 asegura que se incluye exactamente el archivo revisado.
+DRIVERS = {
+    'driver-boletas-58mm.exe': ('1rJ46RHrEVbIThrbVKvDY8aJOiolDVO5l', 'c0608f970689e7889b9a828a684dca9c96485094397c2dad875aad38af1939de'),
+    'driver-boletas-80mm.exe': ('1nTnKXs_8TJHC_pSjOSbzA6ajJru7rB0A', '4937f7f142e5efc6693deb17041eae1e296b0bfe1108bd31f910105d0e808911'),
+}
+
 INSTALADOR = Path(__file__).resolve().parent
 RAIZ = INSTALADOR.parent
 SALIDA = INSTALADOR / 'salida'
@@ -47,6 +54,23 @@ def descargar_python():
         print(f'    descargando {url}')
         urllib.request.urlretrieve(url, zip_path)
     return zip_path
+
+
+def copiar_drivers():
+    CACHE.mkdir(parents=True, exist_ok=True)
+    destino = BUILD / 'drivers'
+    destino.mkdir(parents=True, exist_ok=True)
+    for nombre, (drive_id, sha256) in DRIVERS.items():
+        archivo = CACHE / nombre
+        if not archivo.exists():
+            url = f'https://drive.usercontent.google.com/download?id={drive_id}&export=download&confirm=t'
+            print(f'    descargando {nombre}')
+            urllib.request.urlretrieve(url, archivo)
+        if hashlib.sha256(archivo.read_bytes()).hexdigest() != sha256:
+            archivo.unlink()
+            sys.exit(f'
+El driver {nombre} descargado no coincide con el esperado. Revisa la carpeta Drive del fabricante.')
+        shutil.copy2(archivo, destino / nombre)
 
 
 def preparar_python(zip_path):
@@ -127,6 +151,9 @@ def main():
 
     paso('Copiando el programa')
     app = copiar_programa()
+
+    paso('Agregando los drivers de la impresora de boletas')
+    copiar_drivers()
 
     paso('Verificando el proyecto y reuniendo archivos estáticos')
     manage(python, app, 'check')

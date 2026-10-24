@@ -37,6 +37,9 @@ else:
     RESPALDOS_DIR = BASE_DIR / 'respaldos'
     PRESENTACION_DIR = BASE_DIR / 'media' / 'presentacion'
 
+# Instaladores de drivers que vienen con el programa (junto a la carpeta app/ en el programa instalado)
+DRIVERS_DIR = BASE_DIR.parent / 'drivers'
+
 if INSTALADO:
     # Clave única por instalación, generada por el lanzador
     SECRET_KEY = (DATA_DIR / 'secret.key').read_text(encoding='utf-8').strip()

@@ -79,3 +79,13 @@ Confirma con **Sí**. Luego abre Chloe POS y crea una clave nueva en **Sistema �
 1. Cierra la ventana de Chloe POS y, en el menú Inicio, ejecuta **Chloe POS → Detener Chloe POS**.
 2. Copia el respaldo elegido a `%LOCALAPPDATA%\Chloe POS\` y renómbralo como `chloe-pos.sqlite3` (reemplazando el actual).
 3. Abre Chloe POS desde el ícono.
+
+## Impresora de boletas
+
+El instalador incluye los drivers de la impresora térmica de boletas (rollo de 58 y de 80 mm).
+`construir.py` los descarga de la carpeta Drive del fabricante (la del código QR de la impresora:
+https://drive.google.com/drive/folders/1aiu73h0SrgcRYA2xsl1n4tqER9ScNs83 → Printer → Receipt Driver)
+y comprueba que sean exactamente los archivos revisados.
+
+En el POS, **Sistema → Impresora de boletas** muestra si la impresora está instalada y con qué nombre,
+y si falta el driver ofrece **Instalar driver**. Ahí también se elige el ancho del rollo y se imprime una boleta de prueba.

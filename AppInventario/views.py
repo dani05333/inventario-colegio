@@ -571,6 +571,20 @@ def boleta_config(request):
     return JsonResponse({'status': 'success', 'ancho': impresora.ancho()})
 
 
+@require_GET
+def impresora_estado(request):
+    return JsonResponse(impresora.estado())
+
+
+@require_POST
+def impresora_instalar_driver(request):
+    try:
+        impresora.instalar_driver()
+    except (ValueError, OSError) as e:
+        return _error(str(e) if isinstance(e, ValueError) else 'No se pudo abrir el instalador del driver.')
+    return JsonResponse({'status': 'success'})
+
+
 # ---------------------------------------------------------------------------
 # Presentación de imágenes en la pantalla del cliente
 # ---------------------------------------------------------------------------
