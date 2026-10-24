@@ -9,6 +9,6 @@ def sistema(request):
         'APP_VERSION': settings.APP_VERSION,
         'INSTALADO': settings.INSTALADO,
         'TIENE_CLAVE': seguridad.tiene_clave,   # se evalúa solo si la plantilla lo usa
-        'ACCESO_ADMIN': lambda: seguridad.acceso_admin(request),   # puede ver historial, boletas y análisis
+        'ACCESO_ADMIN': lambda: seguridad.acceso_admin(request),   # puede ver totales de venta, análisis e inventario
         'BOLETA_ANCHO': impresora.ancho,
     }

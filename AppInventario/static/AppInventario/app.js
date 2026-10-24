@@ -345,6 +345,31 @@ const App = (function () {
     }
   }
 
+  /* ---------- Tallas ---------- */
+  const sinTildes = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+
+  /* Orden natural de tallas: números de menor a mayor, luego XS, S, M, L, XL…, luego el resto */
+  const ORDEN_LETRAS = ['xxs', 'xs', 's', 'm', 'l', 'xl', 'xxl', 'xxxl'];
+  function claveTalla(t) {
+    const n = sinTildes(t);
+    if (/^\d+([.,]\d+)?$/.test(n)) return [0, parseFloat(n.replace(',', '.')), ''];
+    const i = ORDEN_LETRAS.indexOf(n);
+    return i >= 0 ? [1, i, ''] : [2, 0, n];
+  }
+  function compararTallas(a, b) {
+    const x = claveTalla(a), y = claveTalla(b);
+    return x[0] - y[0] || x[1] - y[1] || x[2].localeCompare(y[2]);
+  }
+
+  /* Carga rápida: crea una prenda en varias tallas y/o suma unidades a tallas existentes.
+     datos = { uniforme_id, colegio_id, color_id, nuevas: [{talla_id | talla_nombre, cantidad, precio}],
+               sumar: [{inventario_id, cantidad}], clave? } */
+  function cargarTallas(datos) {
+    return fetch(IMP.cargaTallas, {
+      method: 'POST', headers: { 'X-CSRFToken': IMP.csrf, 'Content-Type': 'application/json' }, body: JSON.stringify(datos)
+    }).then(r => r.json().then(d => { if (!r.ok) throw new Error(d.message || 'No se pudo guardar'); return d; }));
+  }
+
   /* ---------- Códigos de barras ---------- */
   const JSBARCODE_URL = STATIC + 'vendor/jsbarcode/JsBarcode.all.min.js';
 
@@ -389,7 +414,7 @@ const App = (function () {
 
   return {
     money, num, esc, toast, formatDateTime, dtLanguage, loadScript, METODOS_PAGO,
-    receiptHtml, printReceipt, downloadReceipt, estadoImpresora, verificarImpresora, instalarDriver, nombreImpresora, armarConjuntos, lineasBoleta,
+    receiptHtml, printReceipt, downloadReceipt, estadoImpresora, verificarImpresora, instalarDriver, nombreImpresora, compararTallas, cargarTallas, armarConjuntos, lineasBoleta,
     JSBARCODE_URL, renderBarcode, esEan13, codigoValido
   };
 })();

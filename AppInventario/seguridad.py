@@ -1,5 +1,5 @@
 """Clave de administrador: se pide para anular o borrar ventas, para eliminar registros y para ver
-cuánto se ha vendido (historial, boletas y análisis)."""
+cuánto se ha vendido y las cantidades (totales del historial, análisis e inventario)."""
 import threading
 import time
 
@@ -60,7 +60,7 @@ def cambiar(nueva, actual=None):
 
 
 # ---------------------------------------------------------------------------
-# Acceso a las secciones con montos de venta: al ingresar la clave quedan abiertas en este
+# Acceso a las secciones con montos de venta o cantidades: al ingresar la clave quedan abiertas en este
 # navegador hasta que se va a otra sección (middleware.CerrarAccesoAlSalir), se presiona
 # «Bloquear» o pasan MINUTOS_ACCESO sin usarlas.
 # ---------------------------------------------------------------------------
@@ -70,7 +70,7 @@ MINUTOS_ACCESO = 10
 
 
 def acceso_admin(request):
-    """True si se puede ver la información de ventas (también si aún no se crea la clave)."""
+    """True si se pueden ver los montos y cantidades protegidos (también si aún no se crea la clave)."""
     if not tiene_clave():
         return True
     return request.session.get(SESION_ACCESO, 0) > time.time()

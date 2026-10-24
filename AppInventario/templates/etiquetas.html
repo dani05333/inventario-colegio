@@ -170,6 +170,17 @@ function cargar() {
     [...new Set(productos.map(p => p.colegio))].sort().forEach(c => sel.append($('<option>').val(c).text(c)));
     sel.val(actual);
 
+    // Viniendo de «Imprimir sus etiquetas» (?productos=id:cantidad,…): ya quedan elegidos
+    const pedidos = new URLSearchParams(location.search).get('productos');
+    if (pedidos && !cargar.preseleccion) {
+      cargar.preseleccion = true;
+      pedidos.split(',').forEach(par => {
+        const [id, cant] = par.split(':').map(Number);
+        const p = productos.find(x => x.id === id);
+        if (p && App.codigoValido(p.codigo)) seleccion.set(id, Math.min(999, Math.max(1, cant || 1)));
+      });
+    }
+
     const sinCodigo = productos.filter(p => !App.codigoValido(p.codigo)).length;
     $('#banner-sin-codigo').toggleClass('d-none', sinCodigo === 0);
     $('#n-sin-codigo').text(sinCodigo);

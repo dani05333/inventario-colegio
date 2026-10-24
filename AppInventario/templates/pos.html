@@ -85,6 +85,9 @@
   .size.low { border-color: #e09a2c; }
   .size.match { border-color: var(--primary); background: var(--primary-50); color: var(--primary); box-shadow: 0 0 0 2px var(--primary-100); }
   .size.out { color: var(--muted); background: var(--surface-2); border-style: dashed; cursor: not-allowed; text-decoration: line-through; }
+  .size.size-add { border-style: dashed; border-color: var(--primary-100); color: var(--primary); font-size: 18px; min-width: 42px; }
+  .size.size-add:hover { border-color: var(--primary); }
+  .mt-chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .size .dot {
     position: absolute; top: -7px; right: -7px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 999px;
     background: var(--primary); color: #fff; font-size: 11px; display: grid; place-items: center;
@@ -275,6 +278,56 @@
   </div>
 </div>
 
+<!-- Modal: agregar tallas a una prenda -->
+<div class="modal fade" id="modalTallas" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title" id="mt-titulo">Agregar tallas</h5>
+          <div class="d-flex align-items-center gap-2 mt-1"><span id="mt-colegio"></span><span class="small text-secondary">Ya tiene: <span id="mt-ya"></span></span></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body" id="mt-form">
+        <label class="form-label">1. Toca las tallas que quieres agregar</label>
+        <div class="mt-chips mb-2" id="mt-chips"></div>
+        <div class="d-flex gap-2 mb-3" style="max-width:340px">
+          <input type="text" class="form-control form-control-sm" id="mt-otra" placeholder="¿Otra talla? Escríbela (ej. 18, XXL)" maxlength="100">
+          <button type="button" class="btn btn-sm btn-light-border text-nowrap" id="mt-otra-btn"><i class="bi bi-plus"></i> Agregar</button>
+        </div>
+        <label class="form-label">2. Cantidad y precio <span class="fw-normal text-secondary">(lo de arriba se aplica a todas; puedes cambiar cada una)</span></label>
+        <div class="d-flex flex-wrap gap-3 mb-2">
+          <div><span class="small text-secondary">Cantidad para todas</span><input type="number" min="0" class="form-control" id="mt-cantidad" style="width:130px"></div>
+          <div><span class="small text-secondary">Precio para todas</span><input type="number" min="0" class="form-control" id="mt-precio" style="width:150px"></div>
+        </div>
+        <table class="table-app d-none" id="mt-tabla">
+          <thead><tr><th>Talla</th><th style="width:140px">Cantidad</th><th style="width:160px">Precio</th><th style="width:44px"></th></tr></thead>
+          <tbody id="mt-filas"></tbody>
+        </table>
+        <div class="mt-3 d-none" id="mt-clave-row" style="max-width:300px">
+          <label class="form-label" for="mt-clave"><i class="bi bi-shield-lock me-1"></i>Clave de administrador</label>
+          <input type="password" class="form-control" id="mt-clave" autocomplete="off">
+        </div>
+        <div class="field-help mt-2">El código de barras de cada talla se genera solo.</div>
+      </div>
+      <div class="modal-body d-none text-center py-4" id="mt-listo">
+        <div class="success-icon"><i class="bi bi-check-lg"></i></div>
+        <h5 class="fw-bold mb-1" id="mt-listo-titulo"></h5>
+        <p class="text-secondary mb-0">Ya aparecen en la tarjeta de la prenda, listas para vender.</p>
+      </div>
+      <div class="modal-footer" id="mt-pie">
+        <button type="button" class="btn btn-light-border" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="mt-guardar" disabled>Agregar tallas</button>
+      </div>
+      <div class="modal-footer d-none" id="mt-pie-listo">
+        <a class="btn btn-light-border" id="mt-etiquetas" target="_blank"><i class="bi bi-upc me-1"></i>Imprimir sus etiquetas</a>
+        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Listo</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal venta exitosa -->
 <div class="modal fade" id="modalExito" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
   <div class="modal-dialog modal-dialog-centered modal-sm">
@@ -330,7 +383,7 @@ function cargarProductos() {
     productos = res.data.map(p => ({
       id: p.id, codigo: String(p.codigo_barras), nombre: p.nombre, uniforme: p.uniforme, color: p.color, talla: p.talla,
       colegio: p.colegio, precio: p.precio_unitario, stock: p.cantidad,
-      uniforme_id: p.uniforme_id, talla_id: p.talla_id, colegio_id: p.colegio_id,
+      uniforme_id: p.uniforme_id, talla_id: p.talla_id, colegio_id: p.colegio_id, color_id: p.color_id,
       _q: `${p.nombre} ${p.talla} ${p.colegio} ${p.codigo_barras}`.toLowerCase()
     }));
     // Sincroniza el carrito guardado con el stock, precio y datos actuales de cada producto
@@ -375,17 +428,7 @@ function coincide(token, familia, estricto) {
 }
 
 /* Orden natural de tallas: números de menor a mayor, luego XS, S, M, L, XL…, luego el resto */
-const ORDEN_LETRAS = ['xxs', 'xs', 's', 'm', 'l', 'xl', 'xxl', 'xxxl'];
-function claveTalla(t) {
-  const n = sinTildes(t);
-  if (/^\d+([.,]\d+)?$/.test(n)) return [0, parseFloat(n.replace(',', '.')), ''];
-  const i = ORDEN_LETRAS.indexOf(n);
-  return i >= 0 ? [1, i, ''] : [2, 0, n];
-}
-function compararTallas(a, b) {
-  const x = claveTalla(a), y = claveTalla(b);
-  return x[0] - y[0] || x[1] - y[1] || x[2].localeCompare(y[2]);
-}
+const compararTallas = App.compararTallas;
 
 /* Una "familia" = misma prenda + color + colegio; sus tallas se muestran como botones en una sola tarjeta */
 let familias = [];
@@ -492,7 +535,7 @@ function renderGrid() {
         ${enVenta ? `<span class="p-incart">${enVenta}</span>` : ''}
         <span class="p-name">${App.esc(f.nombre)}</span>
         ${tagColegio(f.colegio)}
-        <div class="sizes">${botones}</div>
+        <div class="sizes">${botones}<button type="button" class="size size-add" data-familia="${App.esc(f.key)}" title="Agregar tallas a esta prenda"><i class="bi bi-plus-lg"></i></button></div>
         <span class="p-foot">
           <span class="p-price">${min === max ? App.money(min) : App.money(min) + ' – ' + App.money(max)}</span>
           <span class="p-stock ${stock === 0 ? 'low' : ''}">${stock === 0 ? 'Agotado' : stock + ' disp.'}</span>
@@ -655,9 +698,114 @@ $('#chips-prenda').on('click', '.chip', function () { prendaActiva = String($(th
 $('#chips-color').on('click', '.chip', function () { colorActivo = String($(this).data('color')); tallaActiva = ''; renderChips(); renderGrid(); $buscador.focus(); });
 $('#chips-talla').on('click', '.chip', function () { tallaActiva = String($(this).data('talla')); renderChips(); renderGrid(); $buscador.focus(); });
 
-$('#grid').on('click', '.size:not(:disabled)', function () {
+$('#grid').on('click', '.size:not(:disabled):not(.size-add)', function () {
   agregar(Number($(this).data('id')));
   $buscador.focus();
+});
+
+/* ---------- Agregar tallas a una prenda (sin llenar el formulario de inventario) ---------- */
+const ACCESO_INVENTARIO = {% if ACCESO_ADMIN %}true{% else %}false{% endif %};
+const modalTallas = new bootstrap.Modal('#modalTallas');
+let tallasCatalogo = null, familiaTallas = null, nuevasTallas = [];
+
+function precioMasComun(f) {
+  const cuenta = {};
+  f.variantes.forEach(v => { cuenta[v.precio] = (cuenta[v.precio] || 0) + 1; });
+  return Number(Object.keys(cuenta).sort((a, b) => cuenta[b] - cuenta[a])[0] || 0);
+}
+
+function pintarModalTallas() {
+  const tiene = new Set(familiaTallas.variantes.map(v => sinTildes(v.talla)));
+  const elegidas = new Set(nuevasTallas.map(n => sinTildes(n.nombre)));
+  const disponibles = tallasCatalogo.filter(t => !tiene.has(sinTildes(t.nombre))).sort((a, b) => compararTallas(a.nombre, b.nombre));
+  $('#mt-chips').html(disponibles.map(t => `<button type="button" class="chip sm ${elegidas.has(sinTildes(t.nombre)) ? 'active' : ''}" data-id="${t.id}">${App.esc(t.nombre)}</button>`).join('')
+    || '<span class="small text-secondary">Esta prenda ya tiene todas las tallas del catálogo; escribe una nueva abajo.</span>');
+  $('#mt-filas').html(nuevasTallas.map((n, i) => `
+    <tr data-i="${i}">
+      <td class="fw-bold">${App.esc(n.nombre)}${n.talla_id ? '' : ' <span class="badge-soft badge-muted">talla nueva</span>'}</td>
+      <td><input type="number" min="0" class="form-control form-control-sm js-cant" value="${n.cantidad}"></td>
+      <td><input type="number" min="0" class="form-control form-control-sm js-precio" value="${n.precio}"></td>
+      <td><button type="button" class="btn-icon js-quitar" title="Quitar"><i class="bi bi-x-lg"></i></button></td>
+    </tr>`).join(''));
+  $('#mt-tabla').toggleClass('d-none', !nuevasTallas.length);
+  const n = nuevasTallas.length;
+  $('#mt-guardar').prop('disabled', !n).html(`<i class="bi bi-plus-lg me-1"></i>${n ? `Agregar ${n} talla${n === 1 ? '' : 's'}` : 'Agregar tallas'}`);
+}
+
+function sumarTalla(t) {   // t = {talla_id?, talla_nombre?, nombre}
+  if (nuevasTallas.some(n => sinTildes(n.nombre) === sinTildes(t.nombre))) return;
+  nuevasTallas.push({ ...t, cantidad: Math.max(0, parseInt($('#mt-cantidad').val()) || 0), precio: Math.max(0, parseInt($('#mt-precio').val()) || 0) });
+  nuevasTallas.sort((a, b) => compararTallas(a.nombre, b.nombre));
+}
+
+async function abrirAgregarTallas(key) {
+  familiaTallas = familias.find(f => f.key === key);
+  if (!familiaTallas) return;
+  try {
+    if (!tallasCatalogo) tallasCatalogo = (await $.getJSON("{% url 'tallas_json' %}")).data;
+  } catch (e) { App.toast('No se pudieron cargar las tallas', 'error'); return; }
+  nuevasTallas = [];
+  $('#mt-titulo').text(`Agregar tallas · ${familiaTallas.nombre}`);
+  $('#mt-colegio').html(tagColegio(familiaTallas.colegio));
+  $('#mt-ya').text(familiaTallas.variantes.map(v => v.talla).join(', '));
+  $('#mt-cantidad').val(1);
+  $('#mt-precio').val(precioMasComun(familiaTallas));
+  $('#mt-otra, #mt-clave').val('');
+  $('#mt-clave-row').toggleClass('d-none', ACCESO_INVENTARIO);
+  $('#mt-form, #mt-pie').removeClass('d-none');
+  $('#mt-listo, #mt-pie-listo').addClass('d-none');
+  pintarModalTallas();
+  modalTallas.show();
+}
+
+$('#grid').on('click', '.size-add', function () { abrirAgregarTallas(String($(this).data('familia'))); });
+$('#mt-chips').on('click', '.chip', function () {
+  const t = tallasCatalogo.find(x => x.id === Number($(this).data('id')));
+  const i = nuevasTallas.findIndex(n => n.talla_id === t.id);
+  if (i >= 0) nuevasTallas.splice(i, 1); else sumarTalla({ talla_id: t.id, nombre: t.nombre });
+  pintarModalTallas();
+});
+$('#mt-otra-btn').on('click', () => {
+  const nombre = $('#mt-otra').val().replace(/\s+/g, ' ').trim();
+  if (!nombre) { $('#mt-otra').focus(); return; }
+  if (familiaTallas.variantes.some(v => sinTildes(v.talla) === sinTildes(nombre))) { App.toast(`Esta prenda ya tiene la talla ${nombre}`, 'warning'); return; }
+  const existente = tallasCatalogo.find(t => sinTildes(t.nombre) === sinTildes(nombre));
+  sumarTalla(existente ? { talla_id: existente.id, nombre: existente.nombre } : { talla_nombre: nombre, nombre });
+  $('#mt-otra').val('').focus();
+  pintarModalTallas();
+});
+$('#mt-otra').on('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#mt-otra-btn').click(); } });
+$('#mt-cantidad').on('input', function () { nuevasTallas.forEach(n => { n.cantidad = Math.max(0, parseInt(this.value) || 0); }); pintarModalTallas(); });
+$('#mt-precio').on('input', function () { nuevasTallas.forEach(n => { n.precio = Math.max(0, parseInt(this.value) || 0); }); pintarModalTallas(); });
+$('#mt-filas').on('input', '.js-cant, .js-precio', function () {
+  const n = nuevasTallas[Number($(this).closest('tr').data('i'))];
+  n[$(this).hasClass('js-cant') ? 'cantidad' : 'precio'] = Math.max(0, parseInt(this.value) || 0);
+});
+$('#mt-filas').on('click', '.js-quitar', function () { nuevasTallas.splice(Number($(this).closest('tr').data('i')), 1); pintarModalTallas(); });
+
+$('#mt-guardar').on('click', async function () {
+  if (!ACCESO_INVENTARIO && !$('#mt-clave').val()) { App.toast('Escribe la clave de administrador', 'warning'); $('#mt-clave').focus(); return; }
+  const sinPrecio = nuevasTallas.filter(n => !n.precio).map(n => n.nombre);
+  if (sinPrecio.length && !confirm(`Las tallas ${sinPrecio.join(', ')} quedarían con precio $0. ¿Guardar de todas formas?`)) return;
+  const v = familiaTallas.variantes[0];
+  const btn = $(this).prop('disabled', true);
+  try {
+    const r = await App.cargarTallas({
+      uniforme_id: v.uniforme_id, colegio_id: v.colegio_id, color_id: v.color_id,
+      nuevas: nuevasTallas.map(n => ({ ...(n.talla_id ? { talla_id: n.talla_id } : { talla_nombre: n.nombre }), cantidad: n.cantidad, precio: n.precio })),
+      clave: $('#mt-clave').val(),
+    });
+    $('#mt-listo-titulo').text(`Se agregaron las tallas ${r.creados.map(c => c.talla).join(', ')}`);
+    $('#mt-etiquetas').attr('href', "{% url 'etiquetas' %}?productos=" + r.creados.map(c => `${c.id}:${Math.max(1, c.cantidad)}`).join(','));
+    $('#mt-form, #mt-pie').addClass('d-none');
+    $('#mt-listo, #mt-pie-listo').removeClass('d-none');
+    if (nuevasTallas.some(n => !n.talla_id)) tallasCatalogo = null;   // se creó una talla nueva en el catálogo
+    cargarProductos();
+  } catch (err) {
+    App.toast(err.message, 'error', 6000);
+  } finally {
+    btn.prop('disabled', false);
+  }
 });
 
 // Al terminar una venta los filtros vuelven a "Todos" (durante la venta el colegio elegido se mantiene)

@@ -26,6 +26,8 @@
   @media (max-width: 1199.98px) {
     #tabla-ventas .col-unid { display: none; }
     #tabla-ventas .resumen { max-width: 170px !important; }
+    .totales-bloqueados { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }
+    .totales-bloqueados .tb-icono { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--primary-50); color: var(--primary); font-size: 20px; flex: none; }
   }
 </style>
 {% endblock %}
@@ -46,12 +48,31 @@
   </div>
 </div>
 
+{% if ACCESO_ADMIN %}
 <div class="row g-3 mb-4">
   <div class="col-6 col-lg-3"><div class="stat"><div class="stat-label">Boletas</div><div class="stat-value" id="k-ventas">0</div><div class="stat-foot" id="k-anuladas"></div></div></div>
   <div class="col-6 col-lg-3"><div class="stat"><div class="stat-label">Total vendido</div><div class="stat-value" id="k-total">$0</div></div></div>
   <div class="col-6 col-lg-3"><div class="stat"><div class="stat-label">Unidades</div><div class="stat-value" id="k-unidades">0</div></div></div>
   <div class="col-6 col-lg-3"><div class="stat"><div class="stat-label">Ticket promedio</div><div class="stat-value" id="k-ticket">$0</div></div></div>
 </div>
+{% else %}
+<!-- Totales protegidos: la lista de ventas se ve, pero los totales piden la clave de administrador -->
+<form method="post" action="{% url 'abrir_acceso' %}" class="stat totales-bloqueados mb-4">
+  {% csrf_token %}
+  <input type="hidden" name="siguiente" value="{{ request.get_full_path }}">
+  <div class="d-flex align-items-center gap-3 flex-grow-1">
+    <span class="tb-icono"><i class="bi bi-lock-fill"></i></span>
+    <div>
+      <div class="fw-bold">Totales protegidos</div>
+      <div class="small text-secondary">Boletas, total vendido, unidades y ticket promedio se ven con la clave de administrador.</div>
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <input type="password" name="clave" class="form-control" placeholder="Clave de administrador" autocomplete="off" required style="width:210px" aria-label="Clave de administrador">
+    <button type="submit" class="btn btn-primary text-nowrap"><i class="bi bi-unlock me-1"></i>Ver totales</button>
+  </div>
+</form>
+{% endif %}
 
 <div class="panel">
   <div class="panel-header flex-wrap">

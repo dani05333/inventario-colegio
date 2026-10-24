@@ -1,0 +1,229 @@
+{% extends 'base.html' %}
+{% block title %}Carga rápida{% endblock %}
+{% block page_title %}Carga rápida de inventario{% endblock %}
+{% block page_subtitle %}Una prenda en todas sus tallas de una vez, o sumar unidades cuando llega mercadería{% endblock %}
+
+{% block extra_head %}
+<style>
+  .cr-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  @media (max-width: 767.98px) { .cr-grid { grid-template-columns: 1fr; } }
+  .cr-todas { display: flex; flex-wrap: wrap; gap: 16px; align-items: end; padding: 14px 16px; border-radius: 12px; background: var(--surface-2); margin-bottom: 14px; }
+  .cr-todas .form-control { width: 150px; }
+  #cr-tabla td { vertical-align: middle; }
+  #cr-tabla tr.off td:not(:first-child) { opacity: .45; }
+  #cr-tabla .form-control { width: 130px; }
+  .cr-talla { font-weight: 800; font-size: 16px; }
+  .cr-pie { position: sticky; bottom: 0; background: var(--surface); border-top: 1px solid var(--border); padding: 14px 20px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; border-radius: 0 0 16px 16px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="max-width:980px">
+  <a href="{% url 'ver_inventario' %}" class="d-inline-flex align-items-center gap-1 mb-3 text-secondary"><i class="bi bi-arrow-left"></i> Volver al inventario</a>
+
+  <div class="panel mb-3">
+    <div class="panel-header">
+      <div>
+        <h2 class="panel-title">1. ¿Qué prenda?</h2>
+        <p class="panel-sub">Se elige una sola vez para todas las tallas. Para otro colegio, cambia solo el colegio y vuelve a guardar.</p>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div class="cr-grid">
+        <div>
+          <label class="form-label" for="cr-uniforme">Uniforme</label>
+          <select class="form-select" id="cr-uniforme"><option value="">Elige…</option></select>
+          <div class="field-help"><a href="{% url 'crear_uniforme' %}"><i class="bi bi-plus"></i>Nuevo uniforme</a></div>
+        </div>
+        <div>
+          <label class="form-label" for="cr-color">Color <span class="fw-normal text-secondary">(opcional)</span></label>
+          <select class="form-select" id="cr-color"><option value="">Sin color</option></select>
+          <div class="field-help"><a href="{% url 'crear_color' %}"><i class="bi bi-plus"></i>Nuevo color</a></div>
+        </div>
+        <div>
+          <label class="form-label" for="cr-colegio">Colegio</label>
+          <select class="form-select" id="cr-colegio"><option value="">Elige…</option></select>
+          <div class="field-help"><a href="{% url 'crear_colegio' %}"><i class="bi bi-plus"></i>Nuevo colegio</a></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="alert alert-success d-none" id="cr-listo"></div>
+
+  <div class="panel d-none" id="cr-panel-tallas">
+    <div class="panel-header">
+      <div>
+        <h2 class="panel-title">2. Tallas</h2>
+        <p class="panel-sub">Marca las tallas. Las nuevas se crean con su código de barras; a las que ya existen se les suman las unidades.</p>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div class="cr-todas">
+        <div><label class="form-label small mb-1" for="cr-cant-todas">Cantidad para todas las marcadas</label><input type="number" min="0" class="form-control" id="cr-cant-todas" value="1"></div>
+        <div><label class="form-label small mb-1" for="cr-precio-todas">Precio para todas las nuevas</label><input type="number" min="0" class="form-control" id="cr-precio-todas" value="0"></div>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-light-border btn-sm" id="cr-marcar-nuevas">Marcar todas las nuevas</button>
+          <button type="button" class="btn btn-light-border btn-sm" id="cr-desmarcar">Desmarcar todo</button>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table-app" id="cr-tabla">
+          <thead><tr><th style="width:44px"></th><th>Talla</th><th>Estado</th><th>Cantidad</th><th>Precio</th></tr></thead>
+          <tbody id="cr-filas"></tbody>
+        </table>
+      </div>
+      <div class="d-flex gap-2 mt-3" style="max-width:360px">
+        <input type="text" class="form-control" id="cr-otra" placeholder="¿Otra talla? Escríbela (ej. 18, XXL)" maxlength="100">
+        <button type="button" class="btn btn-light-border text-nowrap" id="cr-otra-btn"><i class="bi bi-plus"></i> Agregar</button>
+      </div>
+    </div>
+    <div class="cr-pie">
+      <span class="text-secondary" id="cr-resumen">Marca al menos una talla.</span>
+      <button type="button" class="btn btn-primary btn-lg" id="cr-guardar" disabled><i class="bi bi-check2-circle me-1"></i>Guardar</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let tallas = [], productos = [], filas = [];   // filas: [{talla_id?, nombre, existente?, marcada, cantidad, precio}]
+const nombreSinTildes = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+
+function opciones(sel, lista) {
+  lista.slice().sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { numeric: true }))
+    .forEach(o => $(sel).append($('<option>').val(o.id).text(o.nombre)));
+}
+
+function cargarProductos() {
+  return $.getJSON("{% url 'inventario_json' %}").then(r => { productos = r.data; });
+}
+
+function prendaElegida() {
+  const u = Number($('#cr-uniforme').val()), c = Number($('#cr-colegio').val());
+  return u && c ? { uniforme_id: u, colegio_id: c, color_id: Number($('#cr-color').val()) || null } : null;
+}
+
+/* Arma una fila por cada talla del catálogo; las que la prenda ya tiene muestran su stock y precio */
+function armarFilas() {
+  const p = prendaElegida();
+  $('#cr-panel-tallas').toggleClass('d-none', !p);
+  if (!p) return;
+  const tiene = productos.filter(x => x.uniforme_id === p.uniforme_id && x.colegio_id === p.colegio_id && (x.color_id || null) === p.color_id);
+  const precios = {};
+  tiene.forEach(x => { precios[x.precio_unitario] = (precios[x.precio_unitario] || 0) + 1; });
+  const comun = Number(Object.keys(precios).sort((a, b) => precios[b] - precios[a])[0] || 0);
+  if (comun) $('#cr-precio-todas').val(comun);
+  const extra = filas.filter(f => !f.talla_id);   // tallas nuevas escritas a mano se mantienen
+  filas = tallas.map(t => {
+    const e = tiene.find(x => x.talla_id === t.id);
+    return { talla_id: t.id, nombre: t.nombre, existente: e || null, marcada: false, cantidad: 0, precio: e ? e.precio_unitario : 0 };
+  }).concat(extra.map(f => ({ ...f, marcada: f.marcada })));
+  filas.sort((a, b) => App.compararTallas(a.nombre, b.nombre));
+  pintar();
+}
+
+function pintar() {
+  $('#cr-filas').html(filas.map((f, i) => {
+    const e = f.existente;
+    const estado = e ? `<span class="badge-soft badge-muted">Ya existe</span> <span class="small text-secondary">stock ${App.num(e.cantidad)} · ${App.money(e.precio_unitario)}</span>`
+                     : `<span class="badge-soft badge-ok">Nueva${f.talla_id ? '' : ' (talla nueva)'}</span>`;
+    return `<tr data-i="${i}" class="${f.marcada ? '' : 'off'}">
+      <td><input type="checkbox" class="form-check-input js-marca" ${f.marcada ? 'checked' : ''}></td>
+      <td class="cr-talla">${App.esc(f.nombre)}</td>
+      <td>${estado}</td>
+      <td><input type="number" min="0" class="form-control form-control-sm js-cant" value="${f.cantidad}" ${f.marcada ? '' : 'disabled'}
+                 title="${e ? 'Unidades que llegaron (se suman al stock)' : 'Stock inicial'}"><div class="small text-secondary">${e ? 'a sumar' : 'stock inicial'}</div></td>
+      <td>${e ? `<span class="text-secondary">${App.money(e.precio_unitario)}</span>`
+              : `<input type="number" min="0" class="form-control form-control-sm js-precio" value="${f.precio}" ${f.marcada ? '' : 'disabled'}>`}</td>
+    </tr>`;
+  }).join(''));
+  const nuevas = filas.filter(f => f.marcada && !f.existente).length;
+  const sumar = filas.filter(f => f.marcada && f.existente && f.cantidad > 0).length;
+  const partes = [];
+  if (nuevas) partes.push(`${nuevas} talla${nuevas === 1 ? '' : 's'} nueva${nuevas === 1 ? '' : 's'}`);
+  if (sumar) partes.push(`${sumar} talla${sumar === 1 ? '' : 's'} con unidades para sumar`);
+  $('#cr-resumen').text(partes.length ? partes.join(' · ') : 'Marca al menos una talla.');
+  $('#cr-guardar').prop('disabled', !partes.length);
+}
+
+function marcar(f, si) {
+  f.marcada = si;
+  if (si) {
+    f.cantidad = Math.max(0, parseInt($('#cr-cant-todas').val()) || 0);
+    if (!f.existente) f.precio = Math.max(0, parseInt($('#cr-precio-todas').val()) || 0);
+  }
+}
+
+/* ---------- Eventos ---------- */
+$('#cr-uniforme, #cr-color, #cr-colegio').on('change', () => { $('#cr-listo').addClass('d-none'); armarFilas(); });
+$('#cr-filas').on('change', '.js-marca', function () { marcar(filas[$(this).closest('tr').data('i')], this.checked); pintar(); });
+$('#cr-filas').on('click', 'td.cr-talla', function () {   // tocar el nombre de la talla también la marca
+  const f = filas[$(this).closest('tr').data('i')]; marcar(f, !f.marcada); pintar();
+});
+$('#cr-filas').on('input', '.js-cant, .js-precio', function () {
+  const f = filas[$(this).closest('tr').data('i')];
+  f[$(this).hasClass('js-cant') ? 'cantidad' : 'precio'] = Math.max(0, parseInt(this.value) || 0);
+  const nuevas = filas.filter(x => x.marcada && !x.existente).length, sumar = filas.filter(x => x.marcada && x.existente && x.cantidad > 0).length;
+  $('#cr-guardar').prop('disabled', !(nuevas || sumar));
+});
+$('#cr-filas').on('change', '.js-cant', pintar);
+$('#cr-cant-todas').on('input', function () { filas.forEach(f => { if (f.marcada) f.cantidad = Math.max(0, parseInt(this.value) || 0); }); pintar(); });
+$('#cr-precio-todas').on('input', function () { filas.forEach(f => { if (f.marcada && !f.existente) f.precio = Math.max(0, parseInt(this.value) || 0); }); pintar(); });
+$('#cr-marcar-nuevas').on('click', () => { filas.forEach(f => { if (!f.existente && !f.marcada) marcar(f, true); }); pintar(); });
+$('#cr-desmarcar').on('click', () => { filas.forEach(f => { f.marcada = false; }); pintar(); });
+$('#cr-otra-btn').on('click', () => {
+  const nombre = $('#cr-otra').val().replace(/\s+/g, ' ').trim();
+  if (!nombre) { $('#cr-otra').focus(); return; }
+  const ya = filas.find(f => nombreSinTildes(f.nombre) === nombreSinTildes(nombre));
+  if (ya) { marcar(ya, true); App.toast(`La talla ${ya.nombre} ya está en la lista: quedó marcada`, 'info'); }
+  else { const f = { nombre, existente: null }; marcar(f, true); filas.push(f); filas.sort((a, b) => App.compararTallas(a.nombre, b.nombre)); }
+  $('#cr-otra').val('').focus();
+  pintar();
+});
+$('#cr-otra').on('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#cr-otra-btn').click(); } });
+
+$('#cr-guardar').on('click', async function () {
+  const p = prendaElegida();
+  const marcadas = filas.filter(f => f.marcada);
+  const sinPrecio = marcadas.filter(f => !f.existente && !f.precio).map(f => f.nombre);
+  if (sinPrecio.length && !confirm(`Las tallas ${sinPrecio.join(', ')} quedarían con precio $0. ¿Guardar de todas formas?`)) return;
+  const btn = $(this).prop('disabled', true);
+  try {
+    const r = await App.cargarTallas({
+      ...p,
+      nuevas: marcadas.filter(f => !f.existente).map(f => ({ ...(f.talla_id ? { talla_id: f.talla_id } : { talla_nombre: f.nombre }), cantidad: f.cantidad, precio: f.precio })),
+      sumar: marcadas.filter(f => f.existente && f.cantidad > 0).map(f => ({ inventario_id: f.existente.id, cantidad: f.cantidad })),
+    });
+    const etiquetas = r.creados.map(c => `${c.id}:${Math.max(1, c.cantidad)}`).concat(r.sumados.map(s => `${s.id}:${s.sumadas}`));
+    const partes = [];
+    if (r.creados.length) partes.push(`se crearon las tallas <strong>${r.creados.map(c => App.esc(c.talla)).join(', ')}</strong>`);
+    if (r.sumados.length) partes.push(`se sumaron unidades a ${r.sumados.map(s => `<strong>${App.esc(s.talla)}</strong> (+${s.sumadas})`).join(', ')}`);
+    const prenda = `${$('#cr-uniforme option:selected').text()}${p.color_id ? ' ' + $('#cr-color option:selected').text() : ''} · ${$('#cr-colegio option:selected').text()}`;
+    $('#cr-listo').html(`<i class="bi bi-check-circle-fill me-1"></i><strong>${App.esc(prenda)}:</strong> ${partes.join(' y ')}.
+      ${etiquetas.length ? `<a class="ms-2 fw-semibold" target="_blank" href="{% url 'etiquetas' %}?productos=${etiquetas.join(',')}"><i class="bi bi-upc me-1"></i>Imprimir sus etiquetas</a>` : ''}
+      <div class="small mt-1">Para cargar la misma prenda en otro colegio, cambia el colegio arriba.</div>`).removeClass('d-none');
+    if (marcadas.some(f => !f.talla_id)) tallas = (await $.getJSON("{% url 'tallas_json' %}")).data;   // se crearon tallas nuevas
+    filas = filas.filter(f => f.talla_id);
+    await cargarProductos();
+    armarFilas();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (err) {
+    App.toast(err.message, 'error', 6000);
+    btn.prop('disabled', false);
+  }
+});
+
+/* ---------- Inicio ---------- */
+$.when($.getJSON("{% url 'uniformes_json' %}"), $.getJSON("{% url 'colores_json' %}"), $.getJSON("{% url 'colegios_json' %}"),
+       $.getJSON("{% url 'tallas_json' %}"), cargarProductos())
+  .then((u, co, ce, t) => {
+    opciones('#cr-uniforme', u[0].data);
+    opciones('#cr-color', co[0].data);
+    opciones('#cr-colegio', ce[0].data);
+    tallas = t[0].data;
+  })
+  .fail(() => App.toast('No se pudieron cargar los catálogos', 'error'));
+</script>
+{% endblock %}

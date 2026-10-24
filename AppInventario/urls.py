@@ -40,6 +40,8 @@ urlpatterns = [
     path('inventario/editar/<int:pk>', views.InventarioUpdateView.as_view(), name='editar_inventario'),
     path('inventario/eliminar/<int:pk>',views.InventarioDeleteView.as_view(), name='eliminar_inventario'),
     path('api/inventario/', views.inventario_json, name='inventario_json'),
+    path('inventario/carga-rapida/', views.carga_rapida, name='carga_rapida'),
+    path('api/inventario/carga-tallas/', views.carga_tallas, name='carga_tallas'),
     
     path('punto-de-venta/', views.punto_de_venta, name='punto_de_venta'),
     path('pantalla-cliente/', views.pantalla_cliente, name='pantalla_cliente'),

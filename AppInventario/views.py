@@ -16,12 +16,13 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.dateparse import parse_date
+from django.utils.decorators import method_decorator
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_POST
 from django.views.generic.edit import CreateView, DeleteView, UpdateView
 
 from . import conjuntos, impresora, presentacion, seguridad, sistema
-from .forms import ColegioForm, ColorForm, ConjuntoForm, InventarioForm, TallaForm, UniformeForm
+from .forms import ColegioForm, ColorForm, ConjuntoForm, InventarioForm, TallaForm, UniformeForm, normalizar_nombre
 from .models import Colegio, Color, Conjunto, DetalleVenta, Inventario, PrecioConjuntoTalla, Talla, Uniforme, Venta
 
 logger = logging.getLogger(__name__)
@@ -32,7 +33,8 @@ def inicio(request):
 
 
 # ---------------------------------------------------------------------------
-# Secciones con montos de venta (historial, boletas, análisis): solo con la clave de administrador
+# Secciones con montos de venta o cantidades (análisis, inventario y los totales del historial):
+# solo con la clave de administrador
 # ---------------------------------------------------------------------------
 
 def requiere_admin(vista):
@@ -144,6 +146,7 @@ class UniformeCreateView(CreateView):
     success_url = reverse_lazy('ver_uniformes')
 
 
+@method_decorator(requiere_admin, name='dispatch')
 class InventarioCreateView(CreateView):
     model = Inventario
     form_class = InventarioForm
@@ -190,6 +193,7 @@ class UniformeDeleteView(EliminarProtegidoMixin, DeleteView):
     ayuda_bloqueo = 'Primero elimina o cambia de uniforme esos productos en el inventario.'
 
 
+@method_decorator(requiere_admin, name='dispatch')
 class InventarioUpdateView(UpdateView):
     model = Inventario
     form_class = InventarioForm
@@ -197,6 +201,7 @@ class InventarioUpdateView(UpdateView):
     success_url = reverse_lazy('ver_inventario')
 
 
+@method_decorator(requiere_admin, name='dispatch')
 class InventarioDeleteView(EliminarProtegidoMixin, DeleteView):
     model = Inventario
     success_url = reverse_lazy('ver_inventario')
@@ -303,6 +308,7 @@ def uniformes_json(request):
     data = list(uniformes)
     return JsonResponse({'data': data})
 
+@requiere_admin
 def ver_inventario(request):
     return render(request,'inventario.html')
 
@@ -320,6 +326,7 @@ def inventario_json(request):
             'color': item.color.nombre if item.color_id else '',
             'nombre': item.nombre_completo,
             'uniforme_id': item.uniforme_id,
+            'color_id': item.color_id,
             'talla_id': item.talla_id,
             'colegio_id': item.colegio_id,
             'cantidad': item.cantidad,
@@ -378,6 +385,101 @@ def asignar_codigos(request):
             producto.codigo_barras = codigo
             producto.save(update_fields=['codigo_barras'])
     return JsonResponse({'status': 'success', 'asignados': len(pendientes)})
+
+
+# ---------------------------------------------------------------------------
+# Carga rápida: una prenda (uniforme + color + colegio) en varias tallas de una vez
+# ---------------------------------------------------------------------------
+
+class CargaError(ValueError):
+    """Dato no válido en la carga rápida (el mensaje se muestra tal cual)."""
+
+
+def _numero(valor, que, talla):
+    try:
+        n = int(str(valor).strip() or 0)
+    except ValueError:
+        raise CargaError(f'Revisa {que} de la talla {talla}.')
+    if n < 0:
+        raise CargaError(f'{que.capitalize()} de la talla {talla} no puede ser menor que 0.')
+    return n
+
+
+def _talla_de(fila):
+    """La talla elegida, o una nueva por nombre (si ya existe con ese nombre, se usa esa)."""
+    if fila.get('talla_id'):
+        talla = Talla.objects.filter(pk=fila['talla_id']).first()
+        if not talla:
+            raise CargaError('Una de las tallas ya no existe. Recarga la página.')
+        return talla
+    nombre = normalizar_nombre(fila.get('talla_nombre'))
+    if not nombre:
+        raise CargaError('Escribe el nombre de la talla nueva.')
+    # Igual que al crear tallas: sin importar mayúsculas ni espacios
+    return next((t for t in Talla.objects.all() if normalizar_nombre(t.nombre).casefold() == nombre.casefold()), None) \
+        or Talla.objects.create(nombre=nombre)
+
+
+@require_POST
+def carga_tallas(request):
+    """Crea la prenda en las tallas pedidas (con su stock, precio y código generado) y suma unidades a
+    tallas que ya existen. Todo o nada. Sin la sección de inventario abierta, pide la clave."""
+    try:
+        datos = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return _error('Datos no válidos.')
+    if not seguridad.acceso_admin(request):
+        try:
+            seguridad.verificar(datos.get('clave'))
+        except seguridad.ClaveError as e:
+            return _error(str(e))
+    try:
+        uniforme = Uniforme.objects.get(pk=datos.get('uniforme_id'))
+        colegio = Colegio.objects.get(pk=datos.get('colegio_id'))
+        color = Color.objects.get(pk=datos['color_id']) if datos.get('color_id') else None
+    except (Uniforme.DoesNotExist, Colegio.DoesNotExist, Color.DoesNotExist, ValueError, TypeError):
+        return _error('Elige la prenda y el colegio.')
+    nuevas, sumar = datos.get('nuevas') or [], datos.get('sumar') or []
+    if not isinstance(nuevas, list) or not isinstance(sumar, list) or not (nuevas or sumar):
+        return _error('Marca al menos una talla.')
+
+    try:
+        with transaction.atomic():
+            pendientes, vistas = [], set()
+            for fila in nuevas:
+                talla = _talla_de(fila)
+                if talla.pk in vistas:
+                    raise CargaError(f'La talla {talla} está repetida.')
+                vistas.add(talla.pk)
+                if Inventario.objects.filter(uniforme=uniforme, colegio=colegio, color=color, talla=talla).exists():
+                    raise CargaError(f'La talla {talla} ya existe para esta prenda: suma sus unidades en vez de crearla.')
+                pendientes.append((talla, _numero(fila.get('cantidad'), 'la cantidad', talla),
+                                   _numero(fila.get('precio'), 'el precio', talla)))
+            creados = [Inventario.objects.create(uniforme=uniforme, colegio=colegio, color=color, talla=talla,
+                                                 cantidad=cantidad, precio=precio, codigo_barras=codigo)
+                       for (talla, cantidad, precio), codigo in zip(pendientes, generar_codigos(len(pendientes)))]
+            sumados = []
+            for fila in sumar:
+                producto = (Inventario.objects.select_for_update().select_related('talla')
+                            .filter(pk=fila.get('inventario_id'), uniforme=uniforme, colegio=colegio, color=color).first())
+                if not producto:
+                    raise CargaError('Uno de los productos ya no existe. Recarga la página.')
+                n = _numero(fila.get('cantidad'), 'la cantidad a sumar', producto.talla)
+                if n:
+                    Inventario.objects.filter(pk=producto.pk).update(cantidad=F('cantidad') + n)
+                    sumados.append({'id': producto.pk, 'talla': producto.talla.nombre, 'sumadas': n})
+    except CargaError as e:
+        return _error(str(e))
+    return JsonResponse({
+        'status': 'success',
+        'creados': [{'id': p.pk, 'talla': p.talla.nombre, 'codigo': p.codigo_barras, 'cantidad': p.cantidad} for p in creados],
+        'sumados': sumados,
+    })
+
+
+@requiere_admin
+def carga_rapida(request):
+    return render(request, 'carga_rapida.html')
 
 
 def etiquetas(request):
@@ -535,10 +637,14 @@ def _ventas_con_detalle():
     )
 
 
-@requiere_admin
 def historial_ventas(request):
+    """La lista de ventas se ve sin clave; los totales de arriba solo con la clave (ver la plantilla)."""
+    if seguridad.acceso_admin(request):
+        seguridad.renovar_acceso(request)
     ventas = _ventas_con_detalle().order_by('-fecha')
-    return render(request, 'historial_ventas.html', {'ventas_data': [_venta_dict(v) for v in ventas]})
+    respuesta = render(request, 'historial_ventas.html', {'ventas_data': [_venta_dict(v) for v in ventas]})
+    respuesta['Cache-Control'] = 'no-store'   # que «Atrás» no muestre los totales después de bloquear
+    return respuesta
 
 
 @require_POST
@@ -573,7 +679,6 @@ def anular_venta(request, pk):
     return JsonResponse({'status': 'success', 'venta': _venta_dict(venta)})
 
 
-@requiere_admin
 def boleta(request, pk):
     venta = get_object_or_404(_ventas_con_detalle(), pk=pk)
     anterior = Venta.objects.filter(pk__lt=pk).order_by('-pk').values_list('pk', flat=True).first()
@@ -935,6 +1040,7 @@ def historial_ventas_json(request):
     })
 
 
+@requiere_admin
 def stock_bajo(request):
     umbral = 10  # Stock crítico
     inventario_bajo = Inventario.objects.filter(cantidad__lt=umbral).select_related('uniforme', 'talla', 'colegio', 'color')

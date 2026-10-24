@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block title %}Sección protegida{% endblock %}
 {% block page_title %}Sección protegida{% endblock %}
-{% block page_subtitle %}Las ventas y montos solo los ve quien tiene la clave de administrador{% endblock %}
+{% block page_subtitle %}Los montos de venta y las cantidades solo los ve quien tiene la clave de administrador{% endblock %}
 
 {% block content %}
 <div class="form-shell" style="max-width:460px">
@@ -14,7 +14,7 @@
           <i class="bi bi-lock-fill"></i>
         </div>
         <h2 class="h5 fw-bold mb-2">Ingresa la clave de administrador</h2>
-        <p class="text-secondary mb-0">El historial de ventas, las boletas y el análisis quedan abiertos mientras estés en ellos. Al ir a otra sección, presionar «Bloquear vista de ventas» o pasar 10 minutos sin usarlos, se vuelven a cerrar.</p>
+        <p class="text-secondary mb-0">Los totales del historial, el análisis y el inventario quedan abiertos mientras estés en ellos. Al ir a otra sección, presionar «Bloquear vista de ventas» o pasar 10 minutos sin usarlos, se vuelven a cerrar.</p>
       </div>
       <div class="px-4 pb-3">
         <label class="form-label" for="clave"><i class="bi bi-shield-lock me-1"></i>Clave de administrador</label>
