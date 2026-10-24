@@ -151,7 +151,7 @@
   <button class="fs-hint" id="fs-hint"><i class="bi bi-arrows-fullscreen"></i>Pantalla completa</button>
   <div id="print-area"></div>
 
-  <script>window.APP_STATIC = "{% static '' %}";</script>
+  <script>window.APP_STATIC = "{% static '' %}"; window.APP_BOLETA_ANCHO = {{ BOLETA_ANCHO }};</script>
   <script src="{% static 'AppInventario/app.js' %}"></script>
   <script>
   const canal = 'BroadcastChannel' in window ? new BroadcastChannel('pos-pantalla-cliente') : null;

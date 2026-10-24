@@ -50,6 +50,12 @@ const App = (function () {
     pie: '¡Gracias por su compra!',
   };
 
+  /* Rollo de la impresora de boletas (se elige en Sistema → Impresora de boletas).
+     util = ancho que la impresora alcanza a imprimir, en mm */
+  const ROLLOS = { 58: { util: 48, letra: 11 }, 80: { util: 72, letra: 12 } };
+  const ANCHO_ROLLO = ROLLOS[window.APP_BOLETA_ANCHO] ? window.APP_BOLETA_ANCHO : 58;
+  const ROLLO = ROLLOS[ANCHO_ROLLO];
+
   /* Formas de pago (las mismas claves que Venta.METODOS_PAGO en models.py) */
   const METODOS_PAGO = {
     efectivo:      { nombre: 'Efectivo',      icono: 'bi-cash-coin' },
@@ -153,14 +159,14 @@ const App = (function () {
   function receiptHtml(venta) {
     const rows = lineasBoleta(venta).map(i => `
       <tr><td colspan="2"><strong>${esc(i.nombre)} · T. ${esc(i.talla)}</strong></td></tr>
-      <tr><td>&nbsp;&nbsp;${i.cantidad} x ${money(i.precio)}<br>&nbsp;&nbsp;<small>${esc(i.tipo === 'conjunto' ? i.detalle : i.colegio)}</small></td><td class="r">${money(i.subtotal)}</td></tr>`).join('');
+      <tr><td style="padding-left:2ch">${i.cantidad} x ${money(i.precio)}<br><small>${esc(i.tipo === 'conjunto' ? i.detalle : i.colegio)}</small></td><td class="r">${money(i.subtotal)}</td></tr>`).join('');
     // La forma de pago no se imprime en la boleta; solo el vuelto cuando se pagó en efectivo
     const pago = venta.recibido ? `
       <tr><td>Recibido</td><td class="r">${money(venta.recibido)}</td></tr>
       <tr><td>Vuelto</td><td class="r">${money(venta.vuelto)}</td></tr>` : '';
     const unidades = venta.items.reduce((a, i) => a + i.cantidad, 0);
     return `
-      <div class="receipt">
+      <div class="receipt" style="width:${ROLLO.util}mm;font-size:${ROLLO.letra}px">
         <h3>${esc(NEGOCIO.nombre)}</h3>
         <div class="center">${esc(NEGOCIO.bajada)}</div>
         ${NEGOCIO.lineas.map(l => `<div class="center">${esc(l)}</div>`).join('')}
@@ -182,12 +188,29 @@ const App = (function () {
       </div>`;
   }
 
+  /* Alto de la boleta en mm, midiéndola fuera de la pantalla */
+  function altoBoletaMm(venta) {
+    const holder = document.createElement('div');
+    holder.style.cssText = 'position:fixed;left:-10000px;top:0;background:#fff';
+    holder.innerHTML = receiptHtml(venta);
+    document.body.appendChild(holder);
+    const alto = Math.ceil(holder.offsetHeight * 25.4 / 96);
+    holder.remove();
+    return alto;
+  }
+
   function printReceipt(venta) {
+    // La "hoja" se pide del ancho del rollo y del alto justo de la boleta; si no, el navegador
+    // manda una hoja carta/A4 y la impresora de rollo se queda pegada o bota papel en blanco
+    const alto = altoBoletaMm(venta) + 12;
+    let st = document.getElementById('receipt-page-css');
+    if (!st) { st = document.createElement('style'); st.id = 'receipt-page-css'; document.head.appendChild(st); }
+    st.textContent = `@media print { @page { size: ${ANCHO_ROLLO}mm ${alto}mm; margin: 0; } #print-area { padding: 3mm 0; } }`;
     document.getElementById('print-area').innerHTML = receiptHtml(venta);
     window.print();
   }
 
-  /* Descarga la boleta como PDF en formato de rollo de 80 mm */
+  /* Descarga la boleta como PDF en formato de rollo (58 u 80 mm, según la impresora) */
   async function downloadReceipt(venta) {
     try {
       await loadScript(STATIC + 'vendor/html2pdf/html2pdf.bundle.min.js');
@@ -196,18 +219,18 @@ const App = (function () {
       return;
     }
     const holder = document.createElement('div');
-    holder.style.cssText = 'position:fixed;left:-10000px;top:0;width:272px;background:#fff;padding:0';
+    holder.style.cssText = 'position:fixed;left:-10000px;top:0;background:#fff;padding:0';
     holder.innerHTML = receiptHtml(venta);
-    holder.firstElementChild.style.width = '272px';
     document.body.appendChild(holder);
     const altoMm = Math.ceil(holder.offsetHeight * 25.4 / 96) + 10;
+    const margen = (ANCHO_ROLLO - ROLLO.util) / 2;
     try {
       await html2pdf().set({
-        margin: 4,
+        margin: [4, margen],
         filename: `boleta-${venta.id ?? 'venta'}.pdf`,
         image: { type: 'jpeg', quality: 0.95 },
         html2canvas: { scale: 2.5, backgroundColor: '#ffffff' },
-        jsPDF: { unit: 'mm', format: [80, Math.max(altoMm, 80)], orientation: 'portrait' }
+        jsPDF: { unit: 'mm', format: [ANCHO_ROLLO, Math.max(altoMm, ANCHO_ROLLO)], orientation: 'portrait' }
       }).from(holder.firstElementChild).save();
     } finally {
       holder.remove();

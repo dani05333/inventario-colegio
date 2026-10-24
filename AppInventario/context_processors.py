@@ -1,6 +1,6 @@
 from django.conf import settings
 
-from . import seguridad
+from . import impresora, seguridad
 
 
 def sistema(request):
@@ -9,4 +9,5 @@ def sistema(request):
         'APP_VERSION': settings.APP_VERSION,
         'INSTALADO': settings.INSTALADO,
         'TIENE_CLAVE': seguridad.tiene_clave,   # se evalúa solo si la plantilla lo usa
+        'BOLETA_ANCHO': impresora.ancho,
     }

@@ -16,7 +16,7 @@ from django.utils.dateparse import parse_date
 from django.views.decorators.http import require_GET, require_POST
 from django.views.generic.edit import CreateView, DeleteView, UpdateView
 
-from . import conjuntos, presentacion, seguridad, sistema
+from . import conjuntos, impresora, presentacion, seguridad, sistema
 from .forms import ColegioForm, ColorForm, ConjuntoForm, InventarioForm, TallaForm, UniformeForm
 from .models import Colegio, Color, Conjunto, DetalleVenta, Inventario, PrecioConjuntoTalla, Talla, Uniforme, Venta
 
@@ -557,7 +557,18 @@ def ver_sistema(request):
         'presentacion': presentacion.ajustes(),
         'presentacion_imagenes': presentacion.imagenes(),
         'segundos_opciones': presentacion.SEGUNDOS_OPCIONES,
+        'boleta_anchos': impresora.ANCHOS,
     })
+
+
+@require_POST
+def boleta_config(request):
+    try:
+        datos = json.loads(request.body or '{}')
+        impresora.guardar_ancho(datos.get('ancho'))
+    except (ValueError, TypeError, json.JSONDecodeError):
+        return _error('Ancho de rollo no válido.')
+    return JsonResponse({'status': 'success', 'ancho': impresora.ancho()})
 
 
 # ---------------------------------------------------------------------------

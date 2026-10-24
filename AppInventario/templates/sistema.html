@@ -140,6 +140,28 @@
   </div>
 </div>
 
+<!-- Impresora de boletas -->
+<div class="panel mt-4" style="max-width:1100px" id="impresora">
+  <div class="panel-header">
+    <div>
+      <h2 class="panel-title"><i class="bi bi-printer me-1"></i>Impresora de boletas</h2>
+      <p class="panel-sub">La boleta se ajusta al ancho del rollo de papel de la impresora térmica</p>
+    </div>
+  </div>
+  <div class="panel-body">
+    <div class="d-flex flex-wrap gap-3 align-items-end">
+      <div>
+        <label class="form-label" for="bo-ancho">Ancho del rollo de papel</label>
+        <select class="form-select" id="bo-ancho" style="width:auto">
+          {% for a in boleta_anchos %}<option value="{{ a }}" {% if a == BOLETA_ANCHO %}selected{% endif %}>{{ a }} mm{% if a == 58 %} (rollo angosto, ~5,5 cm){% else %} (rollo ancho, ~8 cm){% endif %}</option>{% endfor %}
+        </select>
+      </div>
+      <button class="btn btn-soft" id="bo-prueba"><i class="bi bi-receipt me-1"></i>Imprimir boleta de prueba</button>
+    </div>
+    <div class="field-help mt-2">En la ventana de impresión elige la impresora de boletas, con márgenes «Ninguno» y escala 100 %.</div>
+  </div>
+</div>
+
 <!-- Clave de administrador -->
 <div class="panel mt-4" style="max-width:1100px" id="clave">
   <div class="panel-header">
@@ -318,6 +340,25 @@ $('#btn-borrar-ventas').on('click', function () {
     $('#bv-clave').val('');
   });
 });
+
+/* ---------- Impresora de boletas ---------- */
+$('#bo-ancho').on('change', function () {
+  $.ajax({
+    url: "{% url 'boleta_config' %}", method: 'POST', contentType: 'application/json',
+    headers: { 'X-CSRFToken': CSRF },
+    data: JSON.stringify({ ancho: Number(this.value) })
+  }).done(r => {
+    App.toast(`Boleta ajustada a rollo de ${r.ancho} mm`, 'success');
+    setTimeout(() => { location.hash = 'impresora'; location.reload(); }, 800);
+  }).fail(() => App.toast('No se pudo guardar', 'error'));
+});
+$('#bo-prueba').on('click', () => App.printReceipt({
+  id: 'PRUEBA', fecha: new Date(), total: 22000, recibido: 25000, vuelto: 3000,
+  items: [
+    { inventario_id: 1, nombre: 'Polerón buzo', talla: '10', colegio: 'Colegio de prueba', cantidad: 1, precio: 12000, subtotal: 12000 },
+    { inventario_id: 2, nombre: 'Pantalón buzo', talla: '10', colegio: 'Colegio de prueba', cantidad: 1, precio: 10000, subtotal: 10000 },
+  ],
+}));
 
 /* ---------- Presentación en la pantalla del cliente ---------- */
 const canalCliente = 'BroadcastChannel' in window ? new BroadcastChannel('pos-pantalla-cliente') : null;

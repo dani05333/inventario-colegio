@@ -97,7 +97,7 @@
   <script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
   <script src="{% static 'vendor/datatables/jquery.dataTables.min.js' %}"></script>
   <script src="{% static 'vendor/datatables/dataTables.bootstrap5.min.js' %}"></script>
-  <script>window.APP_STATIC = "{% static '' %}";</script>
+  <script>window.APP_STATIC = "{% static '' %}"; window.APP_BOLETA_ANCHO = {{ BOLETA_ANCHO }};</script>
   <script src="{% static 'AppInventario/app.js' %}"></script>
   {% if INSTALADO %}
   <script>
