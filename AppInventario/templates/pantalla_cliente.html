@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Pantalla cliente · Chloe Creaciones</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%236250d6'/%3E%3Ctext x='32' y='42' font-family='Arial' font-weight='700' font-size='26' fill='white' text-anchor='middle'%3ECC%3C/text%3E%3C/svg%3E">
+  <link rel="icon" type="image/png" href="{% static 'AppInventario/logo.png' %}">
   <link href="{% static 'vendor/inter/inter.css' %}" rel="stylesheet">
   <link href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}" rel="stylesheet">
   <link href="{% static 'AppInventario/app.css' %}" rel="stylesheet">
@@ -19,7 +19,7 @@
       display: flex; align-items: center; gap: 2.2vmin; padding: 2.4vmin 3.4vmin;
       background: var(--surface); border-bottom: 1px solid var(--border);
     }
-    .cd-head .brand-logo { width: 6vmin; height: 6vmin; border-radius: 1.6vmin; font-size: 2.4vmin; }
+    .cd-head .brand-logo { width: 9vmin; height: 9vmin; }
     .cd-head .name { font-weight: 700; font-size: 2.7vmin; line-height: 1.1; }
     .cd-head .sub { color: var(--muted); font-size: 1.9vmin; }
     .cd-head .clock { margin-left: auto; text-align: right; color: var(--text-2); font-size: 1.9vmin; line-height: 1.2; }
@@ -104,7 +104,7 @@
 <body>
   <div class="cd">
     <header class="cd-head">
-      <span class="brand-logo">CC</span>
+      <img class="brand-logo" src="{% static 'AppInventario/logo.png' %}" alt="Chloe Creaciones">
       <div>
         <div class="name">Chloe Creaciones</div>
         <div class="sub">Uniformes escolares</div>

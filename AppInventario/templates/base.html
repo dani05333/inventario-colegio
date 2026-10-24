@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Inicio{% endblock %} · Chloe Creaciones</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%236250d6'/%3E%3Ctext x='32' y='42' font-family='Arial' font-weight='700' font-size='26' fill='white' text-anchor='middle'%3ECC%3C/text%3E%3C/svg%3E">
+  <link rel="icon" type="image/png" href="{% static 'AppInventario/logo.png' %}">
   <script>
     // Menú lateral compacto (solo íconos): lo que eligió el usuario, o automático en pantallas angostas.
     // Va aquí arriba para que la página no "salte" al cargar.
@@ -27,7 +27,7 @@
 {% with n=request.resolver_match.url_name %}
   <aside class="app-sidebar">
     <a href="{% url 'punto_de_venta' %}" class="brand" title="Chloe Creaciones">
-      <span class="brand-logo">CC</span>
+      <img class="brand-logo" src="{% static 'AppInventario/logo.png' %}" alt="Chloe Creaciones">
       <span class="brand-text">
         <span class="brand-name d-block">Chloe Creaciones</span>
         <span class="brand-sub">Uniformes escolares</span>
