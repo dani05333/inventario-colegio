@@ -125,8 +125,9 @@ button.brand .brand-logo { transition: transform .2s, box-shadow .2s; }
 button.brand:hover .brand-logo { transform: scale(1.08); box-shadow: 0 0 0 3px var(--primary-100), 0 4px 12px rgba(20, 24, 40, .2); }
 .brand-flecha { margin-left: auto; color: var(--muted); font-size: 14px; }
 
-/* Colores de cada sección: uniformes (morado, el de :root), librería (verde azulado) y egresos (ámbar) */
+/* Colores de cada sección: uniformes (morado, el de :root), librería (verde azulado), arriendos (granate) y egresos (ámbar) */
 html[data-seccion="libreria"] { --primary: #0f766e; --primary-600: #0b5f59; --primary-50: #e7f5f3; --primary-100: #c9ebe6; }
+html[data-seccion="arriendos"] { --primary: #be123c; --primary-600: #9f1239; --primary-50: #fdeef1; --primary-100: #fbd5dd; }
 html[data-seccion="egresos"]  { --primary: #b45309; --primary-600: #92400e; --primary-50: #fdf3e6; --primary-100: #fae3c4; }
 
 /* Selector de sección: círculos que salen desde el logo del menú */
@@ -149,7 +150,8 @@ html[data-seccion="egresos"]  { --primary: #b45309; --primary-600: #92400e; --pr
 .sec-switch.abierto .sec-circulo { opacity: 1; }
 .sec-switch.abierto .sec-actual { transform: scale(1); }
 .sec-switch.abierto .sec-otra-1 { transform: translate(170px, -6px) scale(1); }
-.sec-switch.abierto .sec-otra-2 { transform: translate(96px, 196px) scale(1); transition-delay: .07s; }
+.sec-switch.abierto .sec-otra-2 { transform: translate(214px, 176px) scale(1); transition-delay: .06s; }
+.sec-switch.abierto .sec-otra-3 { transform: translate(40px, 236px) scale(1); transition-delay: .12s; }
 .sec-actual .sec-nombre small { opacity: .7; }
 @media (min-width: 992px) { html.rail .sec-anclaje { left: 14px; } }
 .brand-logo {   /* logo redondo de Chloe Creaciones */

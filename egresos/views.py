@@ -13,12 +13,16 @@ from django.views.generic.edit import CreateView, DeleteView, UpdateView
 
 from AppInventario.models import Venta as VentaUniformes
 from AppInventario.views import EliminarProtegidoMixin, requiere_admin
+from arriendos.models import Pago as PagoArriendo
 from libreria.models import Venta as VentaLibreria
 
-from .forms import CategoriaGastoForm, EmpleadoForm, GastoForm, PagoEmpleadoForm, RegistroHorasForm
-from .models import NEGOCIOS, CategoriaGasto, Empleado, Gasto, PagoEmpleado, RegistroHoras
+from .forms import CategoriaGastoForm, EmpleadoForm, GastoForm, PagoEmpleadoForm, ProveedorForm, RegistroHorasForm
+from .models import NEGOCIOS, CategoriaGasto, Empleado, Gasto, PagoEmpleado, Proveedor, RegistroHoras
 
 MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+# Para decir «$5.000 por metro» (y no «por metros»)
+SINGULAR = {'unidades': 'unidad', 'metros': 'metro', 'centímetros': 'centímetro', 'kilos': 'kilo', 'gramos': 'gramo', 'rollos': 'rollo',
+            'conos': 'cono', 'paquetes': 'paquete', 'cajas': 'caja', 'docenas': 'docena', 'litros': 'litro'}
 UNIDADES = ['unidades', 'metros', 'centímetros', 'kilos', 'gramos', 'rollos', 'conos', 'paquetes', 'cajas', 'docenas', 'litros']
 
 
@@ -58,13 +62,15 @@ def _contexto_mes(anio, mes):
 
 
 def _ventas_mes(anio, mes):
-    """Lo vendido en el mes (uniformes + librería), sin las ventas anuladas."""
+    """Lo vendido en el mes: uniformes y librería (sin las ventas anuladas) y lo cobrado en arriendos de trajes."""
     inicio = timezone.make_aware(datetime.combine(date(anio, mes, 1), time.min))
     fa, fm = _mover(anio, mes, 1)
     fin = timezone.make_aware(datetime.combine(date(fa, fm, 1), time.min))
     totales = {}
     for clave, modelo in (('uniformes', VentaUniformes), ('libreria', VentaLibreria)):
         totales[clave] = modelo.objects.filter(fecha__gte=inicio, fecha__lt=fin, anulada=False).aggregate(t=Sum('total'))['t'] or Decimal(0)
+    totales['arriendos'] = PagoArriendo.objects.filter(fecha__year=anio, fecha__month=mes).aggregate(t=Sum('monto'))['t'] or Decimal(0)
+    totales['total'] = totales['uniformes'] + totales['libreria'] + totales['arriendos']
     return totales
 
 
@@ -92,7 +98,7 @@ def resumen(request):
     pa, pm = _mover(anio, mes, -1)
     g_ant, s_ant = _egresos_mes(pa, pm)
     ventas = _ventas_mes(anio, mes)
-    vendido = ventas['uniformes'] + ventas['libreria']
+    vendido = ventas['total']
 
     por_categoria = list(Gasto.objects.filter(fecha__year=anio, fecha__month=mes)
                          .values('categoria__nombre').annotate(total=Sum('monto')).order_by('-total'))
@@ -109,7 +115,7 @@ def resumen(request):
         g, s = _egresos_mes(a, m)
         v = _ventas_mes(a, m)
         serie.append({'mes': f'{MESES[m - 1][:3].capitalize()} {str(a)[2:]}', 'gastos': float(g), 'sueldos': float(s),
-                      'ventas': float(v['uniformes'] + v['libreria'])})
+                      'ventas': float(v['total'])})
 
     pendientes = []
     for e in Empleado.objects.filter(activo=True):
@@ -144,8 +150,9 @@ def gastos(request):
     else:
         ultimo = Gasto.objects.order_by('-creado').first()   # se recuerda la forma de pago y el negocio del último gasto
         form = GastoForm(initial={'fecha': timezone.localdate(), 'metodo_pago': ultimo.metodo_pago if ultimo else 'efectivo',
-                                  'negocio': ultimo.negocio if ultimo else 'uniformes'})
-    lista = Gasto.objects.select_related('categoria').filter(fecha__year=anio, fecha__month=mes)
+                                  'negocio': ultimo.negocio if ultimo else 'uniformes',
+                                  'proveedor': request.GET.get('proveedor', '')})   # «Anotar compra» desde la ficha del proveedor
+    lista = Gasto.objects.select_related('categoria', 'proveedor').filter(fecha__year=anio, fecha__month=mes)
     categoria = request.GET.get('categoria') or ''
     if categoria.isdigit():
         lista = lista.filter(categoria_id=int(categoria))
@@ -157,7 +164,7 @@ def gastos(request):
         'form': form, 'gastos': lista, 'total': lista.aggregate(t=Sum('monto'))['t'] or 0,
         'categorias': CategoriaGasto.objects.all(), 'negocios': NEGOCIOS,
         'f_categoria': categoria, 'f_negocio': negocio, 'unidades': UNIDADES,
-        'proveedores': list(Gasto.objects.exclude(proveedor='').values_list('proveedor', flat=True).distinct()[:200]),
+        'proveedores': list(Proveedor.objects.values_list('nombre', flat=True)),
         'nuevo': request.GET.get('nuevo'),
     })
 
@@ -171,7 +178,7 @@ def gasto_editar(request, pk):
         return redirect(f"{reverse('egresos:gastos')}?mes={gasto.fecha:%Y-%m}")
     return render(request, 'egresos/gasto_form.html', {
         'form': form, 'gasto': gasto, 'unidades': UNIDADES,
-        'proveedores': list(Gasto.objects.exclude(proveedor='').values_list('proveedor', flat=True).distinct()[:200]),
+        'proveedores': list(Proveedor.objects.values_list('nombre', flat=True)),
     })
 
 
@@ -179,6 +186,85 @@ def gasto_editar(request, pk):
 @requiere_admin
 def gasto_eliminar(request, pk):
     get_object_or_404(Gasto, pk=pk).delete()
+    return JsonResponse({'status': 'success'})
+
+
+# ---------------------------------------------------------------------------
+# Proveedores: ficha e historial de compras
+# ---------------------------------------------------------------------------
+
+@requiere_admin
+def proveedores(request):
+    anio = timezone.localdate().year
+    lista = []
+    for p in Proveedor.objects.all():
+        compras = p.gastos.all()
+        ultima = compras.order_by('-fecha').first()
+        lista.append({
+            'p': p, 'ultima': ultima, 'compras': compras.count(),
+            'total_anio': compras.filter(fecha__year=anio).aggregate(t=Sum('monto'))['t'] or 0,
+        })
+    lista.sort(key=lambda x: (x['ultima'].fecha if x['ultima'] else date.min), reverse=True)   # los más recientes primero
+    return render(request, 'egresos/proveedores.html', {'proveedores': lista, 'anio': anio})
+
+
+def _lo_que_se_compra(gastos):
+    """Agrupa las compras por lo que se compró: veces, última vez, cantidad habitual y último precio por unidad."""
+    grupos = {}
+    for g in sorted(gastos, key=lambda g: (g.fecha, g.creado)):   # de la más antigua a la más reciente
+        clave = g.descripcion.casefold()
+        x = grupos.setdefault(clave, {'descripcion': g.descripcion, 'veces': 0, 'total': Decimal(0), 'cantidades': [],
+                                      'unidad': '', 'ultima': None, 'ultimo_monto': None, 'ultimo_unitario': None})
+        x['veces'] += 1
+        x['total'] += g.monto
+        x['ultima'], x['ultimo_monto'] = g.fecha, g.monto
+        x['descripcion'] = g.descripcion
+        if g.cantidad:
+            x['cantidades'].append(g.cantidad)
+            x['unidad'] = g.unidad or x['unidad']
+            x['ultimo_unitario'] = g.precio_unitario
+    for x in grupos.values():
+        x['cantidad_habitual'] = (sum(x['cantidades']) / len(x['cantidades'])) if x['cantidades'] else None
+        x['por'] = SINGULAR.get(x['unidad'].strip().lower(), x['unidad']) or 'unidad'
+    return sorted(grupos.values(), key=lambda x: (x['veces'], x['ultima']), reverse=True)
+
+
+@requiere_admin
+def proveedor(request, pk):
+    prov = get_object_or_404(Proveedor, pk=pk)
+    gastos = list(prov.gastos.select_related('categoria').order_by('-fecha', '-creado'))
+    hoy = timezone.localdate()
+    meses = []
+    for i in range(11, -1, -1):
+        a, m = _mover(hoy.year, hoy.month, -i)
+        total = sum((g.monto for g in gastos if g.fecha.year == a and g.fecha.month == m), Decimal(0))
+        meses.append({'mes': f'{MESES[m - 1][:3].capitalize()} {str(a)[2:]}', 'total': total})
+    maximo = max((x['total'] for x in meses), default=0) or 1
+    for x in meses:
+        x['pct'] = round(x['total'] / maximo * 100)
+    return render(request, 'egresos/proveedor.html', {
+        'prov': prov, 'gastos': gastos, 'frecuentes': _lo_que_se_compra(gastos), 'meses': meses,
+        'total': sum((g.monto for g in gastos), Decimal(0)),
+        'total_anio': sum((g.monto for g in gastos if g.fecha.year == hoy.year), Decimal(0)),
+        'primera': gastos[-1].fecha if gastos else None, 'ultima': gastos[0].fecha if gastos else None,
+    })
+
+
+@requiere_admin
+def proveedor_form(request, pk=None):
+    prov = get_object_or_404(Proveedor, pk=pk) if pk else None
+    form = ProveedorForm(request.POST or None, instance=prov)
+    if request.method == 'POST' and form.is_valid():
+        prov = form.save()
+        return redirect('egresos:proveedor', pk=prov.pk)
+    return render(request, 'egresos/proveedor_form.html', {'form': form, 'prov': prov})
+
+
+@require_POST
+@requiere_admin
+def proveedor_eliminar(request, pk):
+    """Borra la ficha; sus gastos quedan, pero sin proveedor."""
+    get_object_or_404(Proveedor, pk=pk).delete()
     return JsonResponse({'status': 'success'})
 
 

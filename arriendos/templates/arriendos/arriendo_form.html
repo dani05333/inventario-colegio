@@ -1,0 +1,223 @@
+{% extends 'base.html' %}
+{% block title %}{% if arriendo %}Modificar arriendo{% else %}Nuevo arriendo{% endif %}{% endblock %}
+{% block page_title %}{% if arriendo %}Modificar {{ arriendo.folio }}{% else %}Nuevo arriendo{% endif %}{% endblock %}
+{% block page_subtitle %}Quién arrienda, para qué fechas y qué trajes{% endblock %}
+
+{% block extra_head %}
+<style>
+  .af { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  @media (max-width: 1199.98px) { .af { grid-template-columns: 1fr; } }
+  .resultados { border: 1px solid var(--border); border-radius: 12px; max-height: 240px; overflow-y: auto; margin-top: 6px; }
+  .resultados button { display: flex; justify-content: space-between; width: 100%; text-align: left; border: 0; background: none; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  .resultados button:hover { background: var(--primary-50); }
+  .cliente-elegido { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--primary-50); border: 1px solid var(--primary-100); }
+  #catalogo td { vertical-align: middle; }
+  .libres-ok { color: #067647; font-weight: 700; } .libres-no { color: #b42318; font-weight: 800; }
+  #lineas td { vertical-align: middle; } #lineas .form-control { width: 100px; }
+  .problemas { background: #fef3f2; border: 1px solid #fecdca; color: #912018; border-radius: 12px; padding: 12px 14px; }
+  .sticky-res { position: sticky; top: calc(var(--topbar-h) + 20px); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="af">
+  <div class="d-flex flex-column gap-3">
+    <div class="panel">
+      <div class="panel-header"><div><h2 class="panel-title">1. Cliente</h2><p class="panel-sub">Persona, curso, colegio o agrupación</p></div></div>
+      <div class="panel-body">
+        <div id="cli-elegido" class="cliente-elegido d-none"><div><strong id="cli-nombre"></strong><div class="small text-secondary" id="cli-info"></div></div><button type="button" class="btn btn-sm btn-light-border" id="cli-cambiar">Cambiar</button></div>
+        <div id="cli-busqueda">
+          <div class="search-box"><i class="bi bi-search"></i><input type="search" id="cli-q" class="form-control" placeholder="Buscar cliente por nombre o teléfono…" autocomplete="off"></div>
+          <div class="resultados d-none" id="cli-res"></div>
+          <button type="button" class="btn btn-link px-0 mt-1" id="cli-nuevo-btn"><i class="bi bi-person-plus me-1"></i>Es un cliente nuevo</button>
+          <div class="row g-2 d-none" id="cli-nuevo">
+            <div class="col-md-6"><label class="form-label small mb-1" for="nc-nombre">Nombre *</label><input type="text" class="form-control" id="nc-nombre" placeholder="Ej: 4° básico B · Colegio Prado" maxlength="120"></div>
+            <div class="col-md-6"><label class="form-label small mb-1" for="nc-tipo">Tipo</label><select class="form-select" id="nc-tipo">{% for k, v in tipos_cliente %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
+            <div class="col-md-6"><label class="form-label small mb-1" for="nc-contacto">Persona responsable</label><input type="text" class="form-control" id="nc-contacto" placeholder="Ej: profesora Ana Soto" maxlength="120"></div>
+            <div class="col-md-6"><label class="form-label small mb-1" for="nc-telefono">Teléfono</label><input type="text" class="form-control" id="nc-telefono" maxlength="40"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header"><div><h2 class="panel-title">2. Fechas</h2><p class="panel-sub">Los trajes quedan ocupados desde el retiro hasta la devolución (ambos días incluidos)</p></div></div>
+      <div class="panel-body row g-2">
+        <div class="col-md-4"><label class="form-label small mb-1" for="f-retiro">Retiran el</label><input type="date" class="form-control" id="f-retiro"></div>
+        <div class="col-md-4"><label class="form-label small mb-1" for="f-devolucion">Devuelven el</label><input type="date" class="form-control" id="f-devolucion"></div>
+        <div class="col-md-4"><label class="form-label small mb-1" for="f-evento">Evento <span class="fw-normal text-secondary">(opcional)</span></label><input type="text" class="form-control" id="f-evento" placeholder="Ej: Fiestas Patrias" maxlength="150"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header flex-wrap gap-2"><div><h2 class="panel-title">3. Trajes y piezas</h2><p class="panel-sub" id="cat-sub">Elige las fechas para ver cuántos quedan libres</p></div>
+        <div class="search-box" style="min-width:220px"><i class="bi bi-search"></i><input type="search" id="cat-q" class="form-control" placeholder="Buscar traje o pieza…"></div></div>
+      <div class="table-responsive" style="max-height:420px;overflow:auto">
+        <table class="table-app" id="catalogo">
+          <thead style="position:sticky;top:0;z-index:1"><tr><th>Traje o pieza</th><th class="num">Libres</th><th class="num">Precio</th><th style="width:150px"></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="sticky-res">
+    <div class="panel">
+      <div class="panel-header"><div><h2 class="panel-title">Resumen</h2><p class="panel-sub" id="res-fechas">—</p></div></div>
+      <div class="table-responsive">
+        <table class="table-app" id="lineas">
+          <thead><tr><th>Arrienda</th><th>Cant.</th><th>Precio c/u</th><th class="num">Subtotal</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div class="empty py-4" id="lineas-vacio"><i class="bi bi-bag"></i><strong>Aún no agregas trajes</strong>Agrégalos desde la lista.</div>
+      </div>
+      <div class="panel-body border-top">
+        <div class="problemas d-none mb-3" id="problemas"></div>
+        <div class="d-flex justify-content-between fs-5 mb-3"><span>Total</span><strong class="tabular" id="total">$0</strong></div>
+        <div class="row g-2">
+          <div class="col-6"><label class="form-label small mb-1" for="abono">Abono ahora</label><input type="number" min="0" class="form-control" id="abono" placeholder="0"></div>
+          <div class="col-6"><label class="form-label small mb-1" for="abono-metodo">Forma de pago</label><select class="form-select" id="abono-metodo">{% for k, v in metodos_pago %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
+          <div class="col-6"><label class="form-label small mb-1" for="garantia">Garantía</label><input type="number" min="0" class="form-control" id="garantia" placeholder="0" title="Se devuelve al recibir los trajes en buen estado"></div>
+          <div class="col-12"><label class="form-label small mb-1" for="notas">Notas</label><textarea class="form-control" id="notas" rows="2" placeholder="Ej: necesitan tallas de niño, retira el apoderado"></textarea></div>
+        </div>
+        <button type="button" class="btn btn-primary btn-lg w-100 mt-3" id="guardar"><i class="bi bi-check2-circle me-1"></i>{% if arriendo %}Guardar cambios{% else %}Reservar{% endif %}</button>
+        {% if arriendo %}<a href="{% url 'arriendos:detalle' arriendo.pk %}" class="btn btn-link w-100">Cancelar</a>{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{{ clientes|json_script:"clientes-data" }}
+{{ arriendo_data|json_script:"arriendo-data" }}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const CSRF = '{{ csrf_token }}';
+const clientes = JSON.parse(document.getElementById('clientes-data').textContent);
+const previo = JSON.parse(document.getElementById('arriendo-data').textContent);
+const ID = previo && previo.id ? previo.id : null;
+const sinTildes = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+let cliente = null;            // {id, nombre} de un cliente existente
+let catalogo = { trajes: [], piezas: [] };
+let lineas = [];               // [{traje_id|pieza_id, nombre, cantidad, precio}]
+
+/* ---------- Cliente ---------- */
+function elegirCliente(c) {
+  cliente = c;
+  $('#cli-nombre').text(c.nombre);
+  $('#cli-info').text(c.telefono || '');
+  $('#cli-elegido').removeClass('d-none'); $('#cli-busqueda').addClass('d-none');
+}
+$('#cli-q').on('input', function () {
+  const q = sinTildes(this.value.trim());
+  const res = q ? clientes.filter(c => sinTildes(c.nombre + ' ' + (c.telefono || '')).includes(q)).slice(0, 12) : [];
+  $('#cli-res').html(res.map(c => `<button type="button" data-id="${c.id}"><span>${App.esc(c.nombre)}</span><span class="small text-secondary">${App.esc(c.telefono || '')}</span></button>`).join(''))
+    .toggleClass('d-none', !res.length);
+});
+$('#cli-res').on('click', 'button', function () { elegirCliente(clientes.find(c => c.id === Number(this.dataset.id))); $('#cli-nuevo').addClass('d-none'); });
+$('#cli-cambiar').on('click', () => { cliente = null; $('#cli-elegido').addClass('d-none'); $('#cli-busqueda').removeClass('d-none'); $('#cli-q').val('').focus(); });
+$('#cli-nuevo-btn').on('click', () => { $('#cli-nuevo').toggleClass('d-none'); $('#nc-nombre').val($('#cli-q').val()).focus(); $('#cli-res').addClass('d-none'); });
+
+/* ---------- Disponibilidad ---------- */
+const fechas = () => ({ desde: $('#f-retiro').val(), hasta: $('#f-devolucion').val() });
+async function cargarDisponibilidad() {
+  const { desde, hasta } = fechas();
+  if (!desde || !hasta) { $('#cat-sub').text('Elige las fechas para ver cuántos quedan libres'); pintarCatalogo(); return; }
+  if (hasta < desde) { $('#cat-sub').text('La devolución no puede ser antes del retiro'); return; }
+  catalogo = await $.getJSON("{% url 'arriendos:api_disponibilidad' %}", { desde, hasta, excluir: ID || '' });
+  const f = d => new Date(d + 'T12:00').toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short' });
+  $('#cat-sub').text(`Libres del ${f(desde)} al ${f(hasta)}`);
+  $('#res-fechas').text(`${f(desde)} → ${f(hasta)}`);
+  pintarCatalogo(); pintarLineas();
+}
+$('#f-retiro').on('change', function () { if (!$('#f-devolucion').val() || $('#f-devolucion').val() < this.value) $('#f-devolucion').val(this.value); cargarDisponibilidad(); });
+$('#f-devolucion').on('change', cargarDisponibilidad);
+
+function pintarCatalogo() {
+  const q = sinTildes($('#cat-q').val());
+  const filas = [...catalogo.trajes.map(t => ({ ...t, tipo: 'traje' })), ...catalogo.piezas.map(p => ({ ...p, tipo: 'pieza' }))]
+    .filter(x => !q || sinTildes(x.nombre + ' ' + x.categoria).includes(q));
+  $('#catalogo tbody').html(filas.map(x => `
+    <tr>
+      <td><strong>${App.esc(x.nombre)}</strong> ${x.tipo === 'traje' ? '<span class="badge-soft badge-muted">completo</span>' : (x.figurin ? '<span class="badge-soft badge-ok">figurín</span>' : '<span class="badge-soft badge-muted">pieza</span>')}
+        <div class="cell-sub">${App.esc(x.categoria || '')}${x.tipo === 'traje' ? ' · ' + x.piezas.map(p => (p.cantidad > 1 ? p.cantidad + '× ' : '') + App.esc(p.nombre)).join(', ') : ''}</div></td>
+      <td class="num ${x.disponibles > 0 ? 'libres-ok' : 'libres-no'}">${fechas().desde ? x.disponibles : '—'}${x.tipo === 'pieza' && fechas().desde ? `<span class="small text-secondary fw-normal"> de ${x.stock}</span>` : ''}</td>
+      <td class="num">${App.money(x.precio)}</td>
+      <td class="text-end"><button type="button" class="btn btn-sm btn-light-border js-agregar" data-tipo="${x.tipo}" data-id="${x.id}"><i class="bi bi-plus-lg"></i> Agregar</button></td>
+    </tr>`).join('') || '<tr><td colspan="4" class="small text-secondary py-3">No hay trajes que coincidan.</td></tr>');
+}
+$('#cat-q').on('input', pintarCatalogo);
+$('#catalogo').on('click', '.js-agregar', function () {
+  const tipo = this.dataset.tipo, id = Number(this.dataset.id);
+  const x = (tipo === 'traje' ? catalogo.trajes : catalogo.piezas).find(i => i.id === id);
+  const ya = lineas.find(l => l[tipo + '_id'] === id);
+  if (ya) ya.cantidad++; else lineas.push({ [tipo + '_id']: id, nombre: x.nombre, cantidad: 1, precio: x.precio });
+  pintarLineas();
+});
+
+/* Piezas que pide el arriendo (un traje completo pide cada una de sus piezas) vs. las libres */
+function revisarStock() {
+  const pide = {}, libres = Object.fromEntries(catalogo.piezas.map(p => [p.id, p]));
+  lineas.forEach(l => {
+    if (l.traje_id) { const t = catalogo.trajes.find(x => x.id === l.traje_id); (t ? t.piezas : []).forEach(p => { pide[p.id] = (pide[p.id] || 0) + p.cantidad * l.cantidad; }); }
+    else pide[l.pieza_id] = (pide[l.pieza_id] || 0) + l.cantidad;
+  });
+  return Object.entries(pide).filter(([id, n]) => libres[id] && n > libres[id].disponibles)
+    .map(([id, n]) => `«${libres[id].nombre}»: el pedido usa ${n} y quedan ${Math.max(libres[id].disponibles, 0)} libres.`);
+}
+
+function pintarLineas() {
+  $('#lineas tbody').html(lineas.map((l, i) => `
+    <tr data-i="${i}">
+      <td><strong>${App.esc(l.nombre)}</strong>${l.traje_id ? ' <span class="badge-soft badge-muted">completo</span>' : ''}</td>
+      <td><input type="number" min="1" class="form-control form-control-sm js-cant" value="${l.cantidad}"></td>
+      <td><input type="number" min="0" class="form-control form-control-sm js-precio" value="${l.precio}"></td>
+      <td class="num fw-semibold">${App.money(l.cantidad * l.precio)}</td>
+      <td><button type="button" class="btn-icon danger js-quitar" title="Quitar"><i class="bi bi-x-lg"></i></button></td>
+    </tr>`).join(''));
+  $('#lineas-vacio').toggleClass('d-none', lineas.length > 0);
+  $('#total').text(App.money(lineas.reduce((a, l) => a + l.cantidad * l.precio, 0)));
+  const faltan = fechas().desde ? revisarStock() : [];
+  $('#problemas').html(faltan.length ? `<strong><i class="bi bi-exclamation-triangle-fill me-1"></i>No alcanzan para esas fechas:</strong><div>${faltan.map(App.esc).join('</div><div>')}</div>` : '').toggleClass('d-none', !faltan.length);
+}
+$('#lineas').on('change', '.js-cant, .js-precio', function () {
+  const l = lineas[Number($(this).closest('tr').data('i'))];
+  l[$(this).hasClass('js-cant') ? 'cantidad' : 'precio'] = Math.max($(this).hasClass('js-cant') ? 1 : 0, parseInt(this.value) || 0);
+  pintarLineas();
+});
+$('#lineas').on('click', '.js-quitar', function () { lineas.splice(Number($(this).closest('tr').data('i')), 1); pintarLineas(); });
+
+/* ---------- Guardar ---------- */
+$('#guardar').on('click', function () {
+  const datos = {
+    id: ID, evento: $('#f-evento').val(), fecha_retiro: $('#f-retiro').val(), fecha_devolucion: $('#f-devolucion').val(),
+    lineas: lineas.map(l => ({ traje_id: l.traje_id || null, pieza_id: l.pieza_id || null, cantidad: l.cantidad, precio: l.precio })),
+    garantia: $('#garantia').val(), notas: $('#notas').val(), abono: { monto: $('#abono').val(), metodo: $('#abono-metodo').val() },
+  };
+  if (cliente) datos.cliente_id = cliente.id;
+  else datos.cliente_nuevo = { nombre: $('#nc-nombre').val(), tipo: $('#nc-tipo').val(), contacto: $('#nc-contacto').val(), telefono: $('#nc-telefono').val() };
+  const btn = $(this).prop('disabled', true);
+  $.ajax({ url: "{% url 'arriendos:api_guardar' %}", method: 'POST', contentType: 'application/json', headers: { 'X-CSRFToken': CSRF }, data: JSON.stringify(datos) })
+    .done(r => { location.href = r.url; })
+    .fail(xhr => {
+      const d = xhr.responseJSON || {};
+      if (d.problemas) $('#problemas').html(`<strong><i class="bi bi-exclamation-triangle-fill me-1"></i>${App.esc(d.message)}</strong><div>${d.problemas.map(App.esc).join('</div><div>')}</div>`).removeClass('d-none');
+      App.toast(d.message || 'No se pudo guardar', 'error', 7000);
+      btn.prop('disabled', false);
+    });
+});
+
+/* ---------- Inicio ---------- */
+if (previo) {
+  if (previo.fecha_retiro) $('#f-retiro').val(previo.fecha_retiro);
+  if (previo.fecha_devolucion) $('#f-devolucion').val(previo.fecha_devolucion);
+  if (previo.id) {
+    elegirCliente(clientes.find(c => c.id === previo.cliente_id) || { id: previo.cliente_id, nombre: previo.cliente });
+    $('#f-evento').val(previo.evento); $('#garantia').val(previo.garantia || ''); $('#notas').val(previo.notas);
+    lineas = previo.lineas.map(l => ({ ...l }));
+    $('#abono').closest('.col-6').find('label').text('Abono adicional');
+  }
+}
+cargarDisponibilidad().then(pintarLineas);
+</script>
+{% endblock %}

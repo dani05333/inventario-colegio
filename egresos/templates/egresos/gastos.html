@@ -63,7 +63,7 @@
           <td><div class="cell-strong">{{ g.descripcion }}</div><div class="cell-sub">{{ g.get_negocio_display }}{% if g.documento %} · N° {{ g.documento }}{% endif %}{% if g.notas %} · {{ g.notas|truncatechars:50 }}{% endif %}</div></td>
           <td>{{ g.categoria }}</td>
           <td class="text-nowrap">{% if g.cantidad %}{{ g.cantidad|floatformat:"-2" }} {{ g.unidad }}<div class="cell-sub" data-monto-u="{{ g.precio_unitario }}" data-unidad="{{ g.unidad }}"></div>{% else %}<span class="text-secondary">—</span>{% endif %}</td>
-          <td>{{ g.proveedor|default:'—' }}</td>
+          <td>{% if g.proveedor %}<a href="{% url 'egresos:proveedor' g.proveedor_id %}" class="text-reset text-decoration-underline">{{ g.proveedor }}</a>{% else %}—{% endif %}</td>
           <td>{{ g.get_metodo_pago_display }}</td>
           <td class="num fw-semibold" data-monto="{{ g.monto }}"></td>
           <td class="text-end text-nowrap">

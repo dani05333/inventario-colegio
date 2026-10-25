@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block title %}{% if pieza %}Editar{% else %}Nueva{% endif %} pieza{% endblock %}
+{% block page_title %}Inventario de trajes{% endblock %}
+{% block page_subtitle %}{% if pieza %}Editando «{{ pieza }}»{% else %}Agregar una pieza o figurín{% endif %}{% endblock %}
+
+{% block content %}
+<div class="form-shell" style="max-width:720px">
+  <a href="{% url 'arriendos:inventario' %}#piezas" class="d-inline-flex align-items-center gap-1 mb-3 text-secondary"><i class="bi bi-arrow-left"></i> Volver al inventario</a>
+  <form method="post" class="panel" novalidate>
+    {% csrf_token %}
+    <div class="panel-body">
+      {{ form.non_field_errors }}
+      <div class="row g-3">
+        <div class="col-md-6"><label class="form-label" for="{{ form.nombre.id_for_label }}">Nombre</label>{{ form.nombre }}{{ form.nombre.errors }}</div>
+        <div class="col-md-3"><label class="form-label" for="{{ form.categoria.id_for_label }}">Categoría</label>{{ form.categoria }}
+          <div class="field-help"><a href="{% url 'arriendos:categoria_nueva' %}"><i class="bi bi-plus"></i>Nueva categoría</a></div></div>
+        <div class="col-md-3"><label class="form-label" for="{{ form.talla.id_for_label }}">Talla <span class="fw-normal text-secondary">(opcional)</span></label>{{ form.talla }}</div>
+        <div class="col-md-4"><label class="form-label" for="{{ form.stock.id_for_label }}">{{ form.stock.label }}</label>{{ form.stock }}{{ form.stock.errors }}</div>
+        <div class="col-md-4"><label class="form-label" for="{{ form.precio.id_for_label }}">{{ form.precio.label }}</label>{{ form.precio }}{{ form.precio.errors }}</div>
+        <div class="col-md-4 d-flex flex-column justify-content-end gap-1">
+          <div class="form-check form-switch">{{ form.figurin }}<label class="form-check-label" for="{{ form.figurin.id_for_label }}">{{ form.figurin.label }}</label></div>
+          <div class="form-check form-switch">{{ form.activo }}<label class="form-check-label" for="{{ form.activo.id_for_label }}">{{ form.activo.label }}</label></div>
+        </div>
+        <div class="col-12"><label class="form-label" for="{{ form.notas.id_for_label }}">Notas</label>{{ form.notas }}</div>
+      </div>
+    </div>
+    <div class="modal-footer justify-content-end"><button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Guardar</button></div>
+  </form>
+</div>
+{% endblock %}

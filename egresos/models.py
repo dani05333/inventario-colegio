@@ -20,6 +20,38 @@ class CategoriaGasto(models.Model):
         return self.nombre
 
 
+def _normalizar(nombre):
+    return ' '.join((nombre or '').split())
+
+
+class Proveedor(models.Model):
+    """Ficha de a quién se le compra: así cualquiera sabe a quién llamar, qué se le compra y a qué precio."""
+    nombre = models.CharField(max_length=100)
+    contacto = models.CharField('Persona de contacto', max_length=100, blank=True)
+    telefono = models.CharField('Teléfono', max_length=40, blank=True)
+    email = models.EmailField('Correo', blank=True)
+    direccion = models.CharField('Dirección', max_length=200, blank=True)
+    rubro = models.CharField('Qué vende', max_length=150, blank=True)
+    notas = models.TextField(blank=True)
+    creado = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['nombre']
+
+    def __str__(self):
+        return self.nombre
+
+    @classmethod
+    def por_nombre(cls, nombre):
+        """El proveedor con ese nombre (sin importar mayúsculas ni espacios), o uno nuevo. None si no hay nombre."""
+        nombre = _normalizar(nombre)
+        if not nombre:
+            return None
+        clave = nombre.casefold()
+        existente = next((p for p in cls.objects.all() if _normalizar(p.nombre).casefold() == clave), None)
+        return existente or cls.objects.create(nombre=nombre)
+
+
 class Gasto(models.Model):
     fecha = models.DateField(default=timezone.localdate)
     categoria = models.ForeignKey(CategoriaGasto, on_delete=models.PROTECT, related_name='gastos')
@@ -28,7 +60,7 @@ class Gasto(models.Model):
     cantidad = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     unidad = models.CharField(max_length=20, blank=True)
     monto = models.DecimalField(**MONTO)
-    proveedor = models.CharField(max_length=100, blank=True)
+    proveedor = models.ForeignKey(Proveedor, on_delete=models.SET_NULL, null=True, blank=True, related_name='gastos')
     metodo_pago = models.CharField(max_length=20, choices=METODOS_PAGO, default='efectivo')
     negocio = models.CharField(max_length=20, choices=NEGOCIOS, default='uniformes')
     documento = models.CharField('N° de boleta o factura', max_length=40, blank=True)

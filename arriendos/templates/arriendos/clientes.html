@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% block title %}Clientes{% endblock %}
+{% block page_title %}Clientes de arriendos{% endblock %}
+{% block page_subtitle %}Personas, cursos y agrupaciones que arriendan, con su historial{% endblock %}
+{% block topbar_actions %}<a href="{% url 'arriendos:cliente_nuevo' %}" class="btn btn-primary"><i class="bi bi-person-plus me-1"></i>Agregar cliente</a>{% endblock %}
+
+{% block content %}
+<div class="panel">
+  <div class="panel-header"><div class="search-box" style="min-width:280px"><i class="bi bi-search"></i><input type="search" id="q" class="form-control" placeholder="Buscar por nombre, responsable o teléfono…"></div></div>
+  <div class="table-responsive">
+    <table class="table-app" id="tabla">
+      <thead><tr><th>Cliente</th><th>Tipo</th><th>Contacto</th><th class="num">Arriendos</th><th>Último</th></tr></thead>
+      <tbody>
+        {% for x in clientes %}
+        <tr data-q="{{ x.c.nombre|lower }} {{ x.c.contacto|lower }} {{ x.c.telefono }}" style="cursor:pointer" onclick="location.href='{% url 'arriendos:cliente' x.c.pk %}'">
+          <td><a href="{% url 'arriendos:cliente' x.c.pk %}" class="cell-strong text-reset">{{ x.c.nombre }}</a>{% if x.activos %} <span class="badge-soft badge-ok">{{ x.activos }} activo{{ x.activos|pluralize }}</span>{% endif %}</td>
+          <td>{{ x.c.get_tipo_display }}</td>
+          <td>{{ x.c.contacto|default:'' }}{% if x.c.telefono %}<div class="cell-sub"><i class="bi bi-telephone"></i> {{ x.c.telefono }}</div>{% endif %}</td>
+          <td class="num">{{ x.arriendos }}</td>
+          <td>{{ x.ultimo|date:'d/m/Y'|default:'—' }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5"><div class="empty py-4"><i class="bi bi-people"></i><strong>Aún no hay clientes</strong>Se agregan al registrar un arriendo.</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('q').addEventListener('input', function () {
+    const w = this.value.toLowerCase().split(/\s+/).filter(Boolean);
+    document.querySelectorAll('#tabla tbody tr[data-q]').forEach(tr => tr.classList.toggle('d-none', !w.every(x => tr.dataset.q.includes(x))));
+  });
+});
+</script>
+{% endblock %}

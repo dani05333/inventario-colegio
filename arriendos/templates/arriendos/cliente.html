@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block title %}{{ c }}{% endblock %}
+{% block page_title %}{{ c }}{% endblock %}
+{% block page_subtitle %}{{ c.get_tipo_display }}{% if c.contacto %} · {{ c.contacto }}{% endif %}{% if c.telefono %} · {{ c.telefono }}{% endif %}{% endblock %}
+{% block topbar_actions %}
+<a href="{% url 'arriendos:cliente_editar' c.pk %}" class="btn btn-light-border"><i class="bi bi-pencil me-1"></i>Editar</a>
+<a href="{% url 'arriendos:nuevo' %}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Nuevo arriendo</a>
+{% endblock %}
+
+{% block content %}
+<a href="{% url 'arriendos:clientes' %}" class="d-inline-flex align-items-center gap-1 mb-3 text-secondary"><i class="bi bi-arrow-left"></i> Todos los clientes</a>
+{% if c.notas %}<div class="panel mb-3"><div class="panel-body"><strong>Notas:</strong> {{ c.notas|linebreaksbr }}</div></div>{% endif %}
+<div class="panel">
+  <div class="panel-header"><div><h2 class="panel-title">Historial de arriendos <span class="badge-soft badge-muted ms-1">{{ arriendos|length }}</span></h2></div></div>
+  <div class="table-responsive">
+    <table class="table-app">
+      <thead><tr><th>Arriendo</th><th>Evento</th><th>Trajes</th><th>Fechas</th><th>Estado</th><th class="num">Total</th></tr></thead>
+      <tbody>
+        {% for a in arriendos %}
+        <tr style="cursor:pointer" onclick="location.href='{% url 'arriendos:detalle' a.pk %}'">
+          <td class="fw-bold">{{ a.folio }}</td><td>{{ a.evento|default:'—' }}</td>
+          <td><span class="d-inline-block text-truncate" style="max-width:280px">{% for l in a.lineas.all %}{{ l.cantidad }} × {{ l.nombre }}{% if not forloop.last %} · {% endif %}{% endfor %}</span>{% if a.faltantes %}<div class="cell-sub text-danger"><i class="bi bi-exclamation-triangle"></i> {{ a.faltantes|truncatechars:60 }}</div>{% endif %}</td>
+          <td class="text-nowrap">{{ a.fecha_retiro|date:'d/m/Y' }} → {{ a.fecha_devolucion|date:'d/m' }}</td>
+          <td>{% if a.atrasado %}<span class="badge-soft badge-warn">Atrasado</span>{% else %}<span class="badge-soft {% if a.estado == 'entregado' %}badge-ok{% else %}badge-muted{% endif %}">{{ a.get_estado_display }}</span>{% endif %}</td>
+          <td class="num" data-monto="{{ a.total }}"></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="small text-secondary py-3">Aún no tiene arriendos.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>document.addEventListener('DOMContentLoaded', () => document.querySelectorAll('[data-monto]').forEach(el => { el.textContent = App.money(el.dataset.monto); }));</script>
+{% endblock %}

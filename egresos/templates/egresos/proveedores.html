@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block title %}Proveedores{% endblock %}
+{% block page_title %}Proveedores{% endblock %}
+{% block page_subtitle %}A quién se le compra, cómo ubicarlo y qué se le ha comprado{% endblock %}
+{% block topbar_actions %}<a href="{% url 'egresos:proveedor_nuevo' %}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Agregar proveedor</a>{% endblock %}
+
+{% block content %}
+<div class="panel">
+  <div class="panel-header flex-wrap gap-2">
+    <div><h2 class="panel-title">Proveedores <span class="badge-soft badge-muted ms-1">{{ proveedores|length }}</span></h2>
+      <p class="panel-sub">Se agregan solos al anotar un gasto con proveedor. Entra a cada uno para completar su teléfono y dirección.</p></div>
+    <div class="search-box" style="min-width:260px"><i class="bi bi-search"></i><input type="search" id="q" class="form-control" placeholder="Buscar por nombre, rubro o teléfono…"></div>
+  </div>
+  <div class="table-responsive">
+    <table class="table-app" id="tabla">
+      <thead><tr><th>Proveedor</th><th>Qué vende</th><th>Contacto</th><th>Última compra</th><th class="num">Compras</th><th class="num">Gastado en {{ anio }}</th></tr></thead>
+      <tbody>
+        {% for x in proveedores %}
+        <tr data-q="{{ x.p.nombre|lower }} {{ x.p.rubro|lower }} {{ x.p.telefono }} {{ x.p.contacto|lower }}" style="cursor:pointer" onclick="location.href='{% url 'egresos:proveedor' x.p.pk %}'">
+          <td><a href="{% url 'egresos:proveedor' x.p.pk %}" class="cell-strong text-reset">{{ x.p.nombre }}</a>{% if not x.p.telefono and not x.p.direccion %}<div class="cell-sub text-warning"><i class="bi bi-exclamation-circle"></i> faltan sus datos de contacto</div>{% endif %}</td>
+          <td>{{ x.p.rubro|default:'—' }}</td>
+          <td>{% if x.p.telefono %}<i class="bi bi-telephone me-1 text-secondary"></i>{{ x.p.telefono }}{% endif %}{% if x.p.contacto %}<div class="cell-sub">{{ x.p.contacto }}</div>{% endif %}{% if not x.p.telefono and not x.p.contacto %}—{% endif %}</td>
+          <td>{% if x.ultima %}{{ x.ultima.fecha|date:'d/m/Y' }}<div class="cell-sub">{{ x.ultima.descripcion|truncatechars:40 }}</div>{% else %}<span class="text-secondary">Sin compras</span>{% endif %}</td>
+          <td class="num">{{ x.compras }}</td>
+          <td class="num fw-semibold" data-monto="{{ x.total_anio }}"></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6"><div class="empty py-4"><i class="bi bi-shop"></i><strong>Aún no hay proveedores</strong>Aparecen solos al anotar un gasto con proveedor, o <a href="{% url 'egresos:proveedor_nuevo' %}">agrégalo aquí</a>.</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.querySelectorAll('[data-monto]').forEach(el => { el.textContent = App.money(el.dataset.monto); });
+$('#q').on('input', function () {
+  const palabras = this.value.toLowerCase().split(/\s+/).filter(Boolean);
+  $('#tabla tbody tr[data-q]').each(function () { this.classList.toggle('d-none', !palabras.every(w => this.dataset.q.includes(w))); });
+});
+</script>
+{% endblock %}

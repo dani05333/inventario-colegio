@@ -29,7 +29,7 @@
     <div class="stat-foot">{% if var_egresos is not None %}<span class="var {% if var_egresos > 0 %}sube{% else %}baja{% endif %}"><i class="bi bi-arrow-{% if var_egresos > 0 %}up{% else %}down{% endif %}"></i> {{ var_egresos|stringformat:'d'|cut:'-' }} %</span> vs mes anterior (<span data-monto="{{ egresos_anterior }}"></span>){% else %}Sin datos del mes anterior{% endif %}</div></div>
   <div class="stat"><div class="stat-label">Gastos</div><div class="stat-value" data-monto="{{ gastos }}"></div><div class="stat-foot">insumos, servicios, arriendo…</div></div>
   <div class="stat"><div class="stat-label">Sueldos pagados</div><div class="stat-value" data-monto="{{ sueldos }}"></div><div class="stat-foot">sueldos, adelantos y bonos</div></div>
-  <div class="stat"><div class="stat-label">Vendido en el mes</div><div class="stat-value" data-monto="{{ vendido }}"></div><div class="stat-foot">Uniformes <span data-monto="{{ ventas.uniformes }}"></span> · Librería <span data-monto="{{ ventas.libreria }}"></span></div></div>
+  <div class="stat"><div class="stat-label">Vendido en el mes</div><div class="stat-value" data-monto="{{ vendido }}"></div><div class="stat-foot">Uniformes <span data-monto="{{ ventas.uniformes }}"></span> · Librería <span data-monto="{{ ventas.libreria }}"></span> · Arriendos <span data-monto="{{ ventas.arriendos }}"></span></div></div>
   <div class="stat resultado {% if resultado >= 0 %}positivo{% else %}negativo{% endif %}"><div class="stat-label">Resultado del mes</div><div class="stat-value" data-monto="{{ resultado }}"></div><div class="stat-foot">vendido − egresos</div></div>
 </div>
 

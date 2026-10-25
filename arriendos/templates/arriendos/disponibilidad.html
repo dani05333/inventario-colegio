@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}Disponibilidad{% endblock %}
+{% block page_title %}Disponibilidad por fecha{% endblock %}
+{% block page_subtitle %}Cuántos trajes quedan libres para un día o un rango de días{% endblock %}
+
+{% block content %}
+<form method="get" class="panel mb-3">
+  <div class="panel-body d-flex flex-wrap gap-3 align-items-end">
+    <div><label class="form-label" for="desde">Desde (retiro)</label><input type="date" class="form-control" id="desde" name="desde" value="{{ desde|date:'Y-m-d' }}"></div>
+    <div><label class="form-label" for="hasta">Hasta (devolución)</label><input type="date" class="form-control" id="hasta" name="hasta" value="{{ hasta|date:'Y-m-d' }}"></div>
+    <button class="btn btn-primary"><i class="bi bi-search me-1"></i>Ver disponibilidad</button>
+    <a href="{% url 'arriendos:nuevo' %}?fecha={{ desde|date:'Y-m-d' }}" class="btn btn-light-border ms-auto"><i class="bi bi-plus-lg me-1"></i>Arriendo para estas fechas</a>
+  </div>
+</form>
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="panel">
+      <div class="panel-header"><div><h2 class="panel-title">Trajes completos</h2><p class="panel-sub">Se pueden armar con las piezas libres en todo el rango</p></div></div>
+      <div class="table-responsive"><table class="table-app">
+        <thead><tr><th>Traje</th><th>Categoría</th><th class="num">Libres</th></tr></thead>
+        <tbody>{% for t in disp.trajes %}<tr><td class="fw-semibold">{{ t.nombre }}</td><td>{{ t.categoria|default:'—' }}</td><td class="num fw-bold {% if t.disponibles <= 0 %}text-danger{% endif %}">{{ t.disponibles }}</td></tr>
+        {% empty %}<tr><td colspan="3" class="small text-secondary py-3">Aún no hay trajes completos.</td></tr>{% endfor %}</tbody>
+      </table></div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="panel">
+      <div class="panel-header"><div><h2 class="panel-title">Piezas sueltas y figurines</h2></div></div>
+      <div class="table-responsive"><table class="table-app">
+        <thead><tr><th>Pieza</th><th>Categoría</th><th class="num">Libres</th></tr></thead>
+        <tbody>{% for p in disp.piezas %}<tr><td>{{ p.nombre }}{% if p.figurin %} <span class="badge-soft badge-ok">figurín</span>{% endif %}</td><td>{{ p.categoria|default:'—' }}</td>
+          <td class="num"><strong class="{% if p.disponibles <= 0 %}text-danger{% endif %}">{{ p.disponibles }}</strong> <span class="small text-secondary">de {{ p.stock }}</span></td></tr>
+        {% empty %}<tr><td colspan="3" class="small text-secondary py-3">Aún no hay piezas.</td></tr>{% endfor %}</tbody>
+      </table></div>
+    </div>
+  </div>
+</div>
+{% endblock %}

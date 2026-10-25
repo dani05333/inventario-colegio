@@ -1,0 +1,4 @@
+<div class="row g-2">
+  <div class="col-6"><label class="form-label">{{ etiqueta }} <span class="fw-normal text-secondary">(opcional)</span></label><input type="number" min="0" class="form-control js-pago-monto" value="{{ sugerido|floatformat:0 }}"></div>
+  <div class="col-6"><label class="form-label">Forma de pago</label><select class="form-select js-pago-metodo">{% for k, v in metodos_pago %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select></div>
+</div>

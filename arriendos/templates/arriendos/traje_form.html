@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% block title %}{% if traje %}Editar{% else %}Nuevo{% endif %} traje{% endblock %}
+{% block page_title %}Inventario de trajes{% endblock %}
+{% block page_subtitle %}{% if traje %}Editando «{{ traje }}»{% else %}Armar un traje completo con piezas del inventario{% endif %}{% endblock %}
+
+{% block content %}
+<div class="form-shell" style="max-width:820px">
+  <a href="{% url 'arriendos:inventario' %}#trajes" class="d-inline-flex align-items-center gap-1 mb-3 text-secondary"><i class="bi bi-arrow-left"></i> Volver al inventario</a>
+  <form method="post" class="panel" novalidate>
+    {% csrf_token %}
+    <div class="panel-body">
+      {{ form.non_field_errors }}
+      <div class="row g-3">
+        <div class="col-md-6"><label class="form-label" for="{{ form.nombre.id_for_label }}">Nombre</label>{{ form.nombre }}{{ form.nombre.errors }}</div>
+        <div class="col-md-3"><label class="form-label" for="{{ form.categoria.id_for_label }}">Categoría</label>{{ form.categoria }}</div>
+        <div class="col-md-3"><label class="form-label" for="{{ form.talla.id_for_label }}">Talla <span class="fw-normal text-secondary">(opcional)</span></label>{{ form.talla }}</div>
+        <div class="col-md-4"><label class="form-label" for="{{ form.precio.id_for_label }}">{{ form.precio.label }}</label>{{ form.precio }}{{ form.precio.errors }}<div class="field-help" id="suma-sueltas"></div></div>
+        <div class="col-md-4 d-flex align-items-end"><div class="form-check form-switch">{{ form.activo }}<label class="form-check-label" for="{{ form.activo.id_for_label }}">{{ form.activo.label }}</label></div></div>
+      </div>
+
+      <h3 class="h6 fw-bold mt-4 mb-1">Piezas que forman el traje</h3>
+      <p class="small text-secondary mb-2">Por cada traje completo que se arriende se ocupan estas piezas (× la cantidad).
+        {% if not piezas %}<strong>Primero <a href="{% url 'arriendos:pieza_nueva' %}">agrega piezas al inventario</a>.</strong>{% endif %}</p>
+      {% if error %}<div class="field-error mb-2">{{ error }}</div>{% endif %}
+      <table class="table-app" id="comps">
+        <thead><tr><th>Pieza</th><th style="width:120px">Cantidad</th><th style="width:44px"></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <button type="button" class="btn btn-sm btn-light-border mt-2" id="agregar-pieza"><i class="bi bi-plus-lg me-1"></i>Agregar pieza</button>
+      <div class="mt-3"><label class="form-label" for="{{ form.notas.id_for_label }}">Notas</label>{{ form.notas }}</div>
+    </div>
+    <div class="modal-footer justify-content-end"><button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Guardar traje</button></div>
+  </form>
+</div>
+<template id="opciones-piezas">{% for p in piezas %}<option value="{{ p.pk }}" data-precio="{{ p.precio|floatformat:0 }}">{{ p }}{% if p.categoria %} ({{ p.categoria }}){% endif %} · tienen {{ p.stock }}</option>{% endfor %}</template>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const opciones = document.getElementById('opciones-piezas').innerHTML;
+const iniciales = [{% for pid, cant in componentes %}[{{ pid }}, {{ cant }}],{% endfor %}];
+function fila(pid, cant) {
+  const tr = $(`<tr><td><select name="pieza_id" class="form-select form-select-sm"><option value="">Elige una pieza…</option>${opciones}</select></td>
+    <td><input type="number" name="pieza_cantidad" min="1" class="form-control form-control-sm" value="${cant || 1}"></td>
+    <td><button type="button" class="btn-icon danger js-quitar" title="Quitar"><i class="bi bi-x-lg"></i></button></td></tr>`);
+  if (pid) tr.find('select').val(pid);
+  $('#comps tbody').append(tr);
+}
+// Referencia: cuánto costaría arrendar las piezas sueltas, para poner un precio de traje completo coherente
+function sumaSueltas() {
+  let total = 0;
+  $('#comps tbody tr').each(function () { const o = $(this).find('select option:selected'); total += (Number(o.data('precio')) || 0) * (Number($(this).find('input').val()) || 0); });
+  $('#suma-sueltas').text(total ? `Las piezas sueltas suman ${App.money(total)}` : '');
+}
+$('#agregar-pieza').on('click', () => { fila(); sumaSueltas(); });
+$('#comps').on('click', '.js-quitar', function () { $(this).closest('tr').remove(); sumaSueltas(); });
+$('#comps').on('change input', 'select, input', sumaSueltas);
+iniciales.length ? iniciales.forEach(([p, c]) => fila(p, c)) : fila();
+sumaSueltas();
+</script>
+{% endblock %}

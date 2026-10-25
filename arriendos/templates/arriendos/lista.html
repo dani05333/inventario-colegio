@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% block title %}Arriendos{% endblock %}
+{% block page_title %}Arriendos{% endblock %}
+{% block page_subtitle %}Reservas, trajes entregados y devoluciones{% endblock %}
+{% block topbar_actions %}<a href="{% url 'arriendos:nuevo' %}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Nuevo arriendo</a>{% endblock %}
+
+{% block content %}
+<div class="panel">
+  <div class="panel-header flex-wrap gap-2">
+    <div class="d-flex flex-wrap gap-1">
+      {% for clave, nombre in filtros %}<a href="?estado={{ clave }}{% if q %}&q={{ q|urlencode }}{% endif %}" class="btn btn-sm {% if filtro == clave %}btn-primary{% else %}btn-light-border{% endif %}">{{ nombre }}</a>{% endfor %}
+    </div>
+    <form method="get" class="search-box" style="min-width:240px"><input type="hidden" name="estado" value="{{ filtro }}"><i class="bi bi-search"></i><input type="search" name="q" value="{{ q }}" class="form-control" placeholder="Buscar cliente o evento…"></form>
+  </div>
+  <div class="table-responsive">
+    <table class="table-app">
+      <thead><tr><th>Arriendo</th><th>Cliente</th><th>Trajes</th><th>Retiro</th><th>Devolución</th><th>Estado</th><th class="num">Por pagar</th></tr></thead>
+      <tbody>
+        {% for a in arriendos %}
+        <tr style="cursor:pointer" onclick="location.href='{% url 'arriendos:detalle' a.pk %}'">
+          <td class="fw-bold"><a href="{% url 'arriendos:detalle' a.pk %}" class="text-reset">{{ a.folio }}</a></td>
+          <td><div class="cell-strong">{{ a.cliente }}</div>{% if a.evento %}<div class="cell-sub">{{ a.evento }}</div>{% endif %}</td>
+          <td><span class="d-inline-block text-truncate" style="max-width:260px">{% for l in a.lineas.all %}{{ l.cantidad }} × {{ l.nombre }}{% if not forloop.last %} · {% endif %}{% endfor %}</span></td>
+          <td class="text-nowrap">{{ a.fecha_retiro|date:'D d/m' }}</td>
+          <td class="text-nowrap">{{ a.fecha_devolucion|date:'D d/m' }}</td>
+          <td>{% if a.atrasado %}<span class="badge-soft badge-warn">Atrasado</span>{% elif a.estado == 'entregado' %}<span class="badge-soft badge-ok">Entregado</span>{% else %}<span class="badge-soft badge-muted">{{ a.get_estado_display }}</span>{% endif %}</td>
+          <td class="num {% if a.saldo and a.estado != 'cancelado' %}fw-semibold{% endif %}">{% if a.estado == 'cancelado' %}—{% else %}<span data-monto="{{ a.saldo }}"></span>{% endif %}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7"><div class="empty py-4"><i class="bi bi-journal-text"></i><strong>No hay arriendos {% if filtro != 'todos' %}en este filtro{% endif %}</strong><a href="{% url 'arriendos:nuevo' %}">Registra uno nuevo</a></div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>document.addEventListener('DOMContentLoaded', () => document.querySelectorAll('[data-monto]').forEach(el => { el.textContent = App.money(el.dataset.monto); }));</script>
+{% endblock %}

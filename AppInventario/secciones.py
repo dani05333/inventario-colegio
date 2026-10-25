@@ -1,4 +1,4 @@
-"""Secciones del programa: la tienda de uniformes, la librería y los egresos (gastos y sueldos).
+"""Secciones del programa: la tienda de uniformes, la librería, el arriendo de trajes y los egresos.
 
 Cada una tiene su nombre, su logo, su color (ver app.css: html[data-seccion]) y su menú lateral.
 Se sabe en cuál se está por el espacio de nombres de la URL ('libreria:…', 'egresos:…')."""
@@ -8,6 +8,8 @@ SECCIONES = [
      'logo': 'AppInventario/logo.png', 'inicio': 'punto_de_venta', 'menu': 'partials/nav_uniformes.html'},
     {'clave': 'libreria', 'nombre': 'Chloe Librería', 'sub': 'Útiles escolares', 'etiqueta': 'Librería',
      'logo': 'AppInventario/logo-libreria.svg', 'inicio': 'libreria:pos', 'menu': 'libreria/nav.html'},
+    {'clave': 'arriendos', 'nombre': 'Chloe Arriendos', 'sub': 'Trajes folclóricos', 'etiqueta': 'Arriendos',
+     'logo': 'AppInventario/logo-arriendos.svg', 'inicio': 'arriendos:agenda', 'menu': 'arriendos/nav.html'},
     {'clave': 'egresos', 'nombre': 'Chloe Egresos', 'sub': 'Gastos y sueldos', 'etiqueta': 'Egresos',
      'logo': 'AppInventario/logo-egresos.svg', 'inicio': 'egresos:resumen', 'menu': 'egresos/nav.html'},
 ]

@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% block title %}Inventario de trajes{% endblock %}
+{% block page_title %}Inventario de trajes{% endblock %}
+{% block page_subtitle %}Las piezas tienen el stock; los trajes completos se arman con piezas{% endblock %}
+{% block topbar_actions %}
+<a href="{% url 'arriendos:pieza_nueva' %}" class="btn btn-light-border"><i class="bi bi-plus-lg me-1"></i>Pieza o figurín</a>
+<a href="{% url 'arriendos:traje_nuevo' %}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Traje completo</a>
+{% endblock %}
+
+{% block extra_head %}<style>tr.inactivo td { opacity: .5; }</style>{% endblock %}
+
+{% block content %}
+<div class="alert alert-light border d-flex gap-2 align-items-start"><i class="bi bi-lightbulb mt-1"></i>
+  <div><strong>Cómo funciona:</strong> primero agrega las <strong>piezas</strong> (pantalón de diablada, pechera, máscara…) con cuántas tienen. Luego arma el <strong>traje completo</strong> eligiendo sus piezas.
+    Si arriendan un traje completo se ocupan sus piezas, y si arriendan una pieza suelta también: el stock nunca se cuenta dos veces.</div></div>
+
+<div class="panel mb-4" id="trajes">
+  <div class="panel-header"><div><h2 class="panel-title">Trajes completos <span class="badge-soft badge-muted ms-1">{{ trajes|length }}</span></h2><p class="panel-sub">Libres hoy = cuántos se pueden armar con las piezas que no están arrendadas</p></div></div>
+  <div class="table-responsive">
+    <table class="table-app">
+      <thead><tr><th>Traje</th><th>Piezas que lo forman</th><th class="num">Precio completo</th><th class="num">Libres hoy</th><th class="text-end"></th></tr></thead>
+      <tbody>
+        {% for t in trajes %}
+        <tr class="{% if not t.activo %}inactivo{% endif %}" data-tipo="traje" data-id="{{ t.pk }}">
+          <td><div class="cell-strong">{{ t }}</div><div class="cell-sub">{{ t.categoria|default:'Sin categoría' }}{% if not t.activo %} · no se arrienda{% endif %}</div></td>
+          <td class="small">{% for c in t.componentes.all %}{% if c.cantidad > 1 %}{{ c.cantidad }}× {% endif %}{{ c.pieza }}{% if not forloop.last %}, {% endif %}{% empty %}<span class="text-danger">Sin piezas: edítalo para agregarlas</span>{% endfor %}</td>
+          <td class="num" data-monto="{{ t.precio }}"></td>
+          <td class="num fw-bold {% if t.libres_hoy <= 0 %}text-danger{% endif %}">{{ t.libres_hoy }}</td>
+          <td class="text-end text-nowrap"><a href="{% url 'arriendos:traje_editar' t.pk %}" class="btn-icon" title="Editar"><i class="bi bi-pencil"></i></a><button class="btn-icon danger js-eliminar" title="Eliminar" data-nombre="{{ t }}"><i class="bi bi-trash3"></i></button></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5"><div class="empty py-4"><i class="bi bi-person-standing-dress"></i><strong>Aún no hay trajes completos</strong>Primero agrega las piezas y luego <a href="{% url 'arriendos:traje_nuevo' %}">arma un traje</a>.</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="panel" id="piezas">
+  <div class="panel-header"><div><h2 class="panel-title">Piezas y figurines <span class="badge-soft badge-muted ms-1">{{ piezas|length }}</span></h2><p class="panel-sub">Cada pieza con cuántas tienen y su precio si se arrienda suelta</p></div></div>
+  <div class="table-responsive">
+    <table class="table-app">
+      <thead><tr><th>Pieza</th><th>Categoría</th><th class="num">Precio suelta</th><th class="num">Tienen</th><th class="num">Libres hoy</th><th class="text-end"></th></tr></thead>
+      <tbody>
+        {% for p in piezas %}
+        <tr class="{% if not p.activo %}inactivo{% endif %}" data-tipo="pieza" data-id="{{ p.pk }}">
+          <td><span class="cell-strong">{{ p }}</span>{% if p.figurin %} <span class="badge-soft badge-ok">figurín</span>{% endif %}{% if not p.activo %} <span class="cell-sub">· no se arrienda</span>{% endif %}</td>
+          <td>{{ p.categoria|default:'—' }}</td>
+          <td class="num" data-monto="{{ p.precio }}"></td>
+          <td class="num">{{ p.stock }}</td>
+          <td class="num fw-bold {% if p.libres_hoy <= 0 %}text-danger{% endif %}">{{ p.libres_hoy }}</td>
+          <td class="text-end text-nowrap"><a href="{% url 'arriendos:pieza_editar' p.pk %}" class="btn-icon" title="Editar"><i class="bi bi-pencil"></i></a><button class="btn-icon danger js-eliminar" title="Eliminar" data-nombre="{{ p }}"><i class="bi bi-trash3"></i></button></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6"><div class="empty py-4"><i class="bi bi-box-seam"></i><strong>Aún no hay piezas</strong><a href="{% url 'arriendos:pieza_nueva' %}">Agrega la primera</a> (por ejemplo «Pechera de diablada»).</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const CSRF = '{{ csrf_token }}';
+document.querySelectorAll('[data-monto]').forEach(el => { el.textContent = App.money(el.dataset.monto); });
+$('.js-eliminar').on('click', function () {
+  const tr = $(this).closest('tr');
+  if (!confirm(`¿Eliminar «${this.dataset.nombre}»?\nSi ya se arrendó o forma parte de un traje, en vez de borrarse queda como «no se arrienda».`)) return;
+  $.ajax({ url: "{% url 'arriendos:api_eliminar' 'X' 0 %}".replace('/X/0/', `/${tr.data('tipo')}/${tr.data('id')}/`), method: 'POST', headers: { 'X-CSRFToken': CSRF } })
+    .done(r => { App.toast(r.accion === 'eliminado' ? 'Eliminado' : 'Quedó como «no se arrienda»', 'success'); setTimeout(() => location.reload(), 600); })
+    .fail(() => App.toast('No se pudo eliminar', 'error'));
+});
+</script>
+{% endblock %}

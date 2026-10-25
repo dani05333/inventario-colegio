@@ -71,6 +71,7 @@ INSTALLED_APPS = [
     'AppInventario',
     'libreria',   # Chloe Librería: su propio punto de venta e inventario
     'egresos',    # gastos del negocio y sueldos
+    'arriendos',  # arriendo de trajes folclóricos
 ]
 
 MIDDLEWARE = [

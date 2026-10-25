@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+{% block title %}{{ prov }}{% endblock %}
+{% block page_title %}{{ prov }}{% endblock %}
+{% block page_subtitle %}{{ prov.rubro|default:'Proveedor' }}{% endblock %}
+{% block topbar_actions %}
+<a href="{% url 'egresos:gastos' %}?proveedor={{ prov.nombre|urlencode }}#nuevo" class="btn btn-light-border"><i class="bi bi-plus-lg me-1"></i>Anotar compra</a>
+<a href="{% url 'egresos:proveedor_editar' prov.pk %}" class="btn btn-primary"><i class="bi bi-pencil me-1"></i>Editar ficha</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+  .ficha { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px 24px; }
+  .ficha .et { font-size: 12.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .ficha .va { font-weight: 600; }
+  .barras { display: grid; grid-template-columns: repeat(12, 1fr); gap: 6px; align-items: end; height: 120px; }
+  .barras .b { display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: end; }
+  .barras .b span.r { width: 100%; max-width: 26px; border-radius: 4px 4px 0 0; background: var(--primary); min-height: 2px; }
+  .barras .b small { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .dos-col { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  @media (max-width: 1099.98px) { .dos-col { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<a href="{% url 'egresos:proveedores' %}" class="d-inline-flex align-items-center gap-1 mb-3 text-secondary"><i class="bi bi-arrow-left"></i> Todos los proveedores</a>
+
+<div class="panel mb-4">
+  <div class="panel-body ficha">
+    <div><div class="et">Teléfono</div><div class="va">{% if prov.telefono %}<a href="tel:{{ prov.telefono }}">{{ prov.telefono }}</a>{% else %}<span class="text-secondary fw-normal">— <a href="{% url 'egresos:proveedor_editar' prov.pk %}">agregar</a></span>{% endif %}</div></div>
+    <div><div class="et">Contacto</div><div class="va">{{ prov.contacto|default:'—' }}</div></div>
+    <div><div class="et">Dirección</div><div class="va">{{ prov.direccion|default:'—' }}</div></div>
+    <div><div class="et">Correo</div><div class="va">{% if prov.email %}<a href="mailto:{{ prov.email }}">{{ prov.email }}</a>{% else %}—{% endif %}</div></div>
+    {% if prov.notas %}<div style="grid-column:1/-1"><div class="et">Notas</div><div>{{ prov.notas|linebreaksbr }}</div></div>{% endif %}
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3"><div class="stat"><div class="stat-label">Gastado en total</div><div class="stat-value" data-monto="{{ total }}"></div><div class="stat-foot">{{ gastos|length }} compra{{ gastos|length|pluralize }}</div></div></div>
+  <div class="col-6 col-lg-3"><div class="stat"><div class="stat-label">Este año</div><div class="stat-value" data-monto="{{ total_anio }}"></div></div></div>
+  <div class="col-6 col-lg-3"><div class="stat"><div class="stat-label">Última compra</div><div class="stat-value">{{ ultima|date:'d/m/Y'|default:'—' }}</div></div></div>
+  <div class="col-6 col-lg-3"><div class="stat"><div class="stat-label">Le compramos desde</div><div class="stat-value">{{ primera|date:'M Y'|default:'—' }}</div></div></div>
+</div>
+
+<div class="dos-col">
+  <div class="panel">
+    <div class="panel-header"><div><h2 class="panel-title"><i class="bi bi-basket me-1"></i>Lo que normalmente le compramos</h2><p class="panel-sub">Cuántas veces, la cantidad habitual y el último precio: sirve para saber qué pedir y si subió.</p></div></div>
+    <div class="table-responsive">
+      <table class="table-app">
+        <thead><tr><th>Producto</th><th class="num">Veces</th><th>Cantidad habitual</th><th class="num">Último precio</th></tr></thead>
+        <tbody>
+          {% for f in frecuentes %}
+          <tr>
+            <td><div class="fw-semibold">{{ f.descripcion }}</div><div class="cell-sub">última vez {{ f.ultima|date:'d/m/Y' }}</div></td>
+            <td class="num">{{ f.veces }}</td>
+            <td>{% if f.cantidad_habitual %}{{ f.cantidad_habitual|floatformat:"-1" }} {{ f.unidad }}{% else %}—{% endif %}</td>
+            <td class="num text-nowrap">{% if f.ultimo_unitario %}<span data-monto="{{ f.ultimo_unitario }}"></span> <span class="small text-secondary">por {{ f.por }}</span>{% else %}<span data-monto="{{ f.ultimo_monto }}"></span>{% endif %}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="text-secondary small py-3">Aún no hay compras anotadas a este proveedor.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header"><div><h2 class="panel-title">Compras de los últimos 12 meses</h2></div></div>
+    <div class="panel-body">
+      <div class="barras">{% for m in meses %}<div class="b" data-titulo="{{ m.mes }}" data-total="{{ m.total }}"><span class="r" style="height:{{ m.pct }}%"></span><small>{{ m.mes }}</small></div>{% endfor %}</div>
+    </div>
+  </div>
+</div>
+
+<div class="panel mt-4">
+  <div class="panel-header"><div><h2 class="panel-title">Historial de compras</h2><p class="panel-sub">Todo lo que se le ha comprado, del más reciente al más antiguo</p></div></div>
+  <div class="table-responsive">
+    <table class="table-app">
+      <thead><tr><th>Fecha</th><th>Qué se compró</th><th>Categoría</th><th>Cantidad</th><th>Pago</th><th class="num">Monto</th><th></th></tr></thead>
+      <tbody>
+        {% for g in gastos %}
+        <tr>
+          <td class="text-nowrap">{{ g.fecha|date:'d/m/Y' }}</td>
+          <td><div class="cell-strong">{{ g.descripcion }}</div>{% if g.documento or g.notas %}<div class="cell-sub">{% if g.documento %}N° {{ g.documento }}{% endif %}{% if g.notas %} · {{ g.notas|truncatechars:60 }}{% endif %}</div>{% endif %}</td>
+          <td>{{ g.categoria }}</td>
+          <td class="text-nowrap">{% if g.cantidad %}{{ g.cantidad|floatformat:"-2" }} {{ g.unidad }}<div class="cell-sub"><span data-monto="{{ g.precio_unitario }}"></span> c/u</div>{% else %}—{% endif %}</td>
+          <td>{{ g.get_metodo_pago_display }}</td>
+          <td class="num fw-semibold" data-monto="{{ g.monto }}"></td>
+          <td class="text-end"><a href="{% url 'egresos:gasto_editar' g.pk %}" class="btn-icon" title="Editar"><i class="bi bi-pencil"></i></a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7"><div class="empty py-4"><i class="bi bi-receipt"></i><strong>Sin compras</strong><a href="{% url 'egresos:gastos' %}?proveedor={{ prov.nombre|urlencode }}#nuevo">Anota la primera</a></div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.querySelectorAll('[data-monto]').forEach(el => { el.textContent = App.money(el.dataset.monto); });
+document.querySelectorAll('.barras .b').forEach(b => { b.title = `${b.dataset.titulo}: ${App.money(b.dataset.total)}`; });   // monto de cada mes al pasar el mouse
+</script>
+{% endblock %}

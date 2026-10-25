@@ -49,6 +49,8 @@
     <div class="sidebar-cta">
       {% if SECCION.clave == 'egresos' %}
       <a href="{% url 'egresos:gastos' %}#nuevo" class="btn btn-primary" title="Anotar un gasto"><i class="bi bi-plus-lg"></i><span class="ms-1">Anotar gasto</span></a>
+      {% elif SECCION.clave == 'arriendos' %}
+      <a href="{% url 'arriendos:nuevo' %}" class="btn btn-primary" title="Nuevo arriendo"><i class="bi bi-plus-lg"></i><span class="ms-1">Nuevo arriendo</span></a>
       {% else %}
       <a href="{% url SECCION.inicio %}" class="btn btn-primary" title="Nueva venta"><i class="bi bi-plus-lg"></i><span class="ms-1">Nueva venta</span></a>
       {% endif %}

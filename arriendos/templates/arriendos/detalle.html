@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+{% block title %}Arriendo {{ a.folio }}{% endblock %}
+{% block page_title %}Arriendo {{ a.folio }} · {{ a.cliente }}{% endblock %}
+{% block page_subtitle %}{% if a.evento %}{{ a.evento }} · {% endif %}{{ a.fecha_retiro|date:'l d/m/Y' }} → {{ a.fecha_devolucion|date:'l d/m/Y' }}{% endblock %}
+{% block topbar_actions %}
+<button class="btn btn-light-border" id="btn-comprobante"><i class="bi bi-printer me-1"></i>Comprobante</button>
+{% if a.estado == 'reservado' %}<a href="{% url 'arriendos:editar' a.pk %}" class="btn btn-light-border"><i class="bi bi-pencil me-1"></i>Modificar</a>{% endif %}
+{% endblock %}
+
+{% block extra_head %}
+<style>
+  .estado { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; padding: 16px 20px; border-radius: 16px; margin-bottom: 20px; }
+  .estado.reservado { background: var(--primary-50); border: 1px solid var(--primary-100); }
+  .estado.entregado { background: #ecfdf3; border: 1px solid #abefc6; }
+  .estado.atrasado { background: #fef3f2; border: 1px solid #fecdca; }
+  .estado.devuelto, .estado.cancelado { background: var(--surface-2); border: 1px solid var(--border); }
+  .estado h2 { font-size: 18px; font-weight: 800; margin: 0; }
+  .dos-col { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  @media (max-width: 1099.98px) { .dos-col { grid-template-columns: 1fr; } }
+  .cuenta div { display: flex; justify-content: space-between; padding: 6px 0; }
+  .cuenta .saldo { font-size: 20px; font-weight: 800; border-top: 1px solid var(--border); margin-top: 6px; padding-top: 10px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<a href="{% url 'arriendos:lista' %}" class="d-inline-flex align-items-center gap-1 mb-3 text-secondary"><i class="bi bi-arrow-left"></i> Todos los arriendos</a>
+
+<div class="estado {% if a.atrasado %}atrasado{% else %}{{ a.estado }}{% endif %}">
+  <div>
+    <h2>{% if a.atrasado %}<i class="bi bi-clock-history me-1"></i>Atrasado: debía volver el {{ a.fecha_devolucion|date:'d/m' }}
+        {% elif a.estado == 'reservado' %}<i class="bi bi-bookmark-check me-1"></i>Reservado: retiran el {{ a.fecha_retiro|date:'l d/m' }}
+        {% elif a.estado == 'entregado' %}<i class="bi bi-box-arrow-up-right me-1"></i>Entregado: devuelven el {{ a.fecha_devolucion|date:'l d/m' }}
+        {% elif a.estado == 'devuelto' %}<i class="bi bi-check2-circle me-1"></i>Devuelto el {{ a.devuelto_en|date:'d/m/Y' }}
+        {% else %}<i class="bi bi-x-circle me-1"></i>Cancelado{% endif %}</h2>
+    <div class="small text-secondary mt-1">{{ a.unidades }} prenda{{ a.unidades|pluralize }}{% if a.entregado_en %} · entregado el {{ a.entregado_en|date:'d/m H:i' }}{% endif %}</div>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    {% if a.estado == 'reservado' %}
+      <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#mEntregar"><i class="bi bi-box-arrow-up-right me-1"></i>Entregar trajes</button>
+      <button class="btn btn-light-border" data-bs-toggle="modal" data-bs-target="#mCancelar">Cancelar reserva</button>
+    {% elif a.estado == 'entregado' %}
+      <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#mDevolver"><i class="bi bi-box-arrow-in-down me-1"></i>Recibir devolución</button>
+    {% endif %}
+    {% if a.estado != 'cancelado' and a.saldo %}<button class="btn btn-light-border" data-bs-toggle="modal" data-bs-target="#mPago"><i class="bi bi-cash me-1"></i>Registrar pago</button>{% endif %}
+  </div>
+</div>
+
+<div class="dos-col">
+  <div class="d-flex flex-column gap-3">
+    <div class="panel">
+      <div class="panel-header"><div><h2 class="panel-title">Trajes y piezas</h2></div></div>
+      <div class="table-responsive"><table class="table-app">
+        <thead><tr><th>Arrienda</th><th class="num">Cantidad</th><th class="num">Precio c/u</th><th class="num">Subtotal</th></tr></thead>
+        <tbody>{% for l in a.lineas.all %}<tr><td class="fw-semibold">{{ l.nombre }}{% if l.es_traje %} <span class="badge-soft badge-muted">completo</span>{% endif %}</td><td class="num">{{ l.cantidad }}</td><td class="num" data-monto="{{ l.precio_unitario }}"></td><td class="num" data-monto="{{ l.subtotal }}"></td></tr>{% endfor %}</tbody>
+      </table></div>
+    </div>
+    {% if a.faltantes or a.notas %}
+    <div class="panel"><div class="panel-body">
+      {% if a.faltantes %}<div class="mb-2"><strong class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>Faltantes o daños:</strong> {{ a.faltantes|linebreaksbr }}</div>{% endif %}
+      {% if a.notas %}<div><strong>Notas:</strong> {{ a.notas|linebreaksbr }}</div>{% endif %}
+    </div></div>
+    {% endif %}
+  </div>
+
+  <div class="d-flex flex-column gap-3">
+    <div class="panel">
+      <div class="panel-header"><div><h2 class="panel-title">Cliente</h2></div><a href="{% url 'arriendos:cliente' a.cliente.pk %}" class="btn btn-light-border btn-sm">Ver historial</a></div>
+      <div class="panel-body pt-0">
+        <div class="fw-bold">{{ a.cliente }}</div>
+        <div class="small text-secondary">{{ a.cliente.get_tipo_display }}{% if a.cliente.contacto %} · {{ a.cliente.contacto }}{% endif %}</div>
+        {% if a.cliente.telefono %}<div class="mt-1"><i class="bi bi-telephone me-1"></i><a href="tel:{{ a.cliente.telefono }}">{{ a.cliente.telefono }}</a></div>{% endif %}
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><div><h2 class="panel-title">Cuenta</h2></div></div>
+      <div class="panel-body pt-0 cuenta">
+        <div><span>Arriendo</span><span data-monto="{{ a.total }}"></span></div>
+        {% if a.cargo_extra %}<div><span>Cargo por daños o atraso</span><span data-monto="{{ a.cargo_extra }}"></span></div>{% endif %}
+        {% for p in a.pagos.all %}<div class="text-secondary"><span>{{ p.get_tipo_display }} · {{ p.fecha|date:'d/m' }} · {{ p.get_metodo_pago_display }}</span><span>−<span data-monto="{{ p.monto }}"></span></span></div>{% endfor %}
+        <div class="saldo"><span>{% if a.saldo %}Por pagar{% else %}Pagado{% endif %}</span><span class="{% if a.saldo %}text-danger{% else %}text-success{% endif %}" data-monto="{{ a.saldo }}"></span></div>
+        {% if a.garantia %}<div class="mt-2 small"><span>Garantía recibida</span><span><span data-monto="{{ a.garantia }}"></span>{% if a.estado == 'devuelto' %} · {% if a.garantia_devuelta %}<span class="text-success">devuelta</span>{% else %}<span class="text-danger">no devuelta</span>{% endif %}{% endif %}</span></div>{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Entregar -->
+<div class="modal fade" id="mEntregar" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title">Entregar los trajes</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div>
+  <div class="modal-body">
+    <p class="mb-3">Confirma que {{ a.cliente }} retira {{ a.unidades }} prenda{{ a.unidades|pluralize }}. Devuelven el <strong>{{ a.fecha_devolucion|date:'l d/m' }}</strong>.</p>
+    {% include 'arriendos/_pago.html' with sugerido=a.saldo etiqueta='Pago al retirar' %}
+  </div>
+  <div class="modal-footer"><button type="button" class="btn btn-light-border" data-bs-dismiss="modal">Volver</button><button type="button" class="btn btn-primary js-accion" data-accion="entregar">Entregar</button></div>
+</div></div></div>
+
+<!-- Devolver -->
+<div class="modal fade" id="mDevolver" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title">Recibir la devolución</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div>
+  <div class="modal-body">
+    <label class="form-label" for="faltantes">¿Falta algo o volvió dañado? <span class="fw-normal text-secondary">(déjalo vacío si todo volvió bien)</span></label>
+    <textarea class="form-control mb-3" id="faltantes" rows="2" placeholder="Ej: falta 1 máscara, pechera con costura rota"></textarea>
+    <div class="row g-2 mb-3">
+      <div class="col-6"><label class="form-label" for="cargo">Cargo por daños o atraso</label><input type="number" min="0" class="form-control" id="cargo" value="0"></div>
+      {% if a.garantia %}<div class="col-6 d-flex align-items-end"><div class="form-check"><input class="form-check-input" type="checkbox" id="garantia-dev" checked><label class="form-check-label" for="garantia-dev">Se devuelve la garantía (<span data-monto="{{ a.garantia }}"></span>)</label></div></div>{% endif %}
+    </div>
+    {% include 'arriendos/_pago.html' with sugerido=a.saldo etiqueta='Pago al devolver' %}
+  </div>
+  <div class="modal-footer"><button type="button" class="btn btn-light-border" data-bs-dismiss="modal">Volver</button><button type="button" class="btn btn-primary js-accion" data-accion="devolver">Recibir</button></div>
+</div></div></div>
+
+<!-- Pago -->
+<div class="modal fade" id="mPago" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title">Registrar pago</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div>
+  <div class="modal-body">{% include 'arriendos/_pago.html' with sugerido=a.saldo etiqueta='Monto' %}</div>
+  <div class="modal-footer"><button type="button" class="btn btn-light-border" data-bs-dismiss="modal">Volver</button><button type="button" class="btn btn-primary js-accion" data-accion="pago">Registrar</button></div>
+</div></div></div>
+
+<!-- Cancelar -->
+<div class="modal fade" id="mCancelar" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title">Cancelar la reserva</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div>
+  <div class="modal-body"><p>Los trajes quedan libres para esas fechas.{% if a.pagado %} Ya se pagaron <strong data-monto="{{ a.pagado }}"></strong>: si los devuelves, anótalo en el motivo.{% endif %}</p>
+    <label class="form-label" for="motivo">Motivo</label><input type="text" class="form-control" id="motivo" placeholder="Ej: se suspendió el evento"></div>
+  <div class="modal-footer"><button type="button" class="btn btn-light-border" data-bs-dismiss="modal">Volver</button><button type="button" class="btn btn-danger js-accion" data-accion="cancelar">Cancelar reserva</button></div>
+</div></div></div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const CSRF = '{{ csrf_token }}';
+document.querySelectorAll('[data-monto]').forEach(el => { el.textContent = App.money(el.dataset.monto); });
+
+$('.js-accion').on('click', function () {
+  const modal = $(this).closest('.modal');
+  const datos = { accion: this.dataset.accion, pago: { monto: modal.find('.js-pago-monto').val(), metodo: modal.find('.js-pago-metodo').val() } };
+  if (datos.accion === 'devolver') Object.assign(datos, { faltantes: $('#faltantes').val(), cargo_extra: $('#cargo').val(), garantia_devuelta: $('#garantia-dev').prop('checked') });
+  if (datos.accion === 'cancelar') datos.motivo = $('#motivo').val();
+  const btn = $(this).prop('disabled', true);
+  $.ajax({ url: "{% url 'arriendos:api_accion' a.pk %}", method: 'POST', contentType: 'application/json', headers: { 'X-CSRFToken': CSRF }, data: JSON.stringify(datos) })
+    .done(() => location.reload())
+    .fail(xhr => { App.toast((xhr.responseJSON && xhr.responseJSON.message) || 'No se pudo guardar', 'error', 6000); btn.prop('disabled', false); });
+});
+// Al recibir con un cargo, el pago sugerido suma el cargo
+$('#cargo').on('input', function () { $('#mDevolver .js-pago-monto').val(Number({{ a.saldo|floatformat:0 }}) + (Number(this.value) || 0)); });
+
+/* Comprobante para el cliente (en la impresora de boletas) */
+$('#btn-comprobante').on('click', () => {
+  const f = d => new Date(d + 'T12:00').toLocaleDateString('es-CL', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+  App.printReceipt({
+    negocio: 'arriendos', titulo: 'Comprobante', folio: '{{ a.folio }}', fecha: new Date(), total: {{ a.total|floatformat:0 }},
+    items: [{% for l in a.lineas.all %}{ inventario_id: {{ forloop.counter }}, nombre: "{{ l.nombre|escapejs }}", talla: '', colegio: '', cantidad: {{ l.cantidad }}, precio: {{ l.precio_unitario|floatformat:0 }}, subtotal: {{ l.subtotal|floatformat:0 }} },{% endfor %}],
+    extras: [
+      {% if a.cargo_extra %}{ t: 'Cargo extra', v: App.money({{ a.cargo_extra|floatformat:0 }}) },{% endif %}
+      { t: 'Pagado', v: App.money({{ a.pagado|floatformat:0 }}) },
+      { t: 'Por pagar', v: App.money({{ a.saldo|floatformat:0 }}), destacar: true },
+      {% if a.garantia %}{ t: 'Garantía', v: App.money({{ a.garantia|floatformat:0 }}) },{% endif %}
+    ],
+    leyenda: ['Cliente: {{ a.cliente|escapejs }}', 'Retiro: ' + f('{{ a.fecha_retiro|date:"Y-m-d" }}'), 'DEVOLUCIÓN: ' + f('{{ a.fecha_devolucion|date:"Y-m-d" }}')],
+  });
+});
+</script>
+{% endblock %}

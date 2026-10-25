@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block title %}Categorías{% endblock %}
+{% block page_title %}Categorías de trajes{% endblock %}
+{% block page_subtitle %}Diablada, caporal, tinku, morenada, cueca…{% endblock %}
+
+{% block content %}
+{% url 'arriendos:categoria_nueva' as crear_url %}{% url 'arriendos:categoria_editar' 0 as editar_url0 %}{% url 'arriendos:categoria_eliminar' 0 as eliminar_url0 %}{% url 'arriendos:categorias_json' as json_url %}
+{% include 'partials/catalogo.html' with singular='Categoría' plural='Categorías' ayuda='Para agrupar los trajes y piezas por tipo de baile.' %}
+{% endblock %}

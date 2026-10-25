@@ -2,7 +2,7 @@ from django import forms
 
 from AppInventario.forms import NombreUnicoForm, normalizar_nombre
 
-from .models import CategoriaGasto, Empleado, Gasto, PagoEmpleado, RegistroHoras
+from .models import CategoriaGasto, Empleado, Gasto, PagoEmpleado, Proveedor, RegistroHoras
 
 
 class FormEstilado(forms.ModelForm):
@@ -29,9 +29,13 @@ class CategoriaGastoForm(NombreUnicoForm):
 
 
 class GastoForm(FormEstilado):
+    # El proveedor se escribe (con sugerencias); al guardar se enlaza su ficha o se crea una nueva
+    proveedor = forms.CharField(label='Proveedor', max_length=100, required=False,
+                                widget=forms.TextInput(attrs={'list': 'proveedores', 'autocomplete': 'off'}))
+
     class Meta:
         model = Gasto
-        fields = ['fecha', 'categoria', 'descripcion', 'cantidad', 'unidad', 'monto', 'proveedor', 'metodo_pago', 'negocio', 'documento', 'notas']
+        fields = ['fecha', 'categoria', 'descripcion', 'cantidad', 'unidad', 'monto', 'metodo_pago', 'negocio', 'documento', 'notas']
         labels = {'descripcion': 'Qué se compró', 'monto': 'Monto total', 'metodo_pago': 'Forma de pago', 'negocio': 'Para qué negocio'}
         widgets = {
             'fecha': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
@@ -45,12 +49,40 @@ class GastoForm(FormEstilado):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['categoria'].empty_label = 'Elige…'
+        if self.instance.pk and self.instance.proveedor_id:
+            self.initial.setdefault('proveedor', self.instance.proveedor.nombre)
+        # El proveedor va junto a la cantidad (en el mismo orden que antes)
+        self.order_fields(['fecha', 'categoria', 'descripcion', 'cantidad', 'unidad', 'monto', 'proveedor', 'metodo_pago', 'negocio', 'documento', 'notas'])
 
     def clean_descripcion(self):
         return normalizar_nombre(self.cleaned_data.get('descripcion'))
 
     def clean_proveedor(self):
         return normalizar_nombre(self.cleaned_data.get('proveedor'))
+
+    def save(self, commit=True):
+        gasto = super().save(commit=False)
+        gasto.proveedor = Proveedor.por_nombre(self.cleaned_data.get('proveedor'))
+        if commit:
+            gasto.save()
+        return gasto
+
+
+class ProveedorForm(FormEstilado):
+    class Meta:
+        model = Proveedor
+        fields = ['nombre', 'rubro', 'contacto', 'telefono', 'email', 'direccion', 'notas']
+        widgets = {'notas': forms.Textarea(attrs={'rows': 3, 'placeholder': 'Ej: atiende de lunes a viernes, hace envíos, da crédito a 30 días…'}),
+                   'rubro': forms.TextInput(attrs={'placeholder': 'Ej: telas, hilos y botones'})}
+
+    def clean_nombre(self):
+        nombre = normalizar_nombre(self.cleaned_data.get('nombre'))
+        if not nombre:
+            raise forms.ValidationError('Escribe el nombre del proveedor.')
+        repetido = next((p for p in Proveedor.objects.exclude(pk=self.instance.pk) if normalizar_nombre(p.nombre).casefold() == nombre.casefold()), None)
+        if repetido:
+            raise forms.ValidationError(f'Ya existe el proveedor «{repetido}».')
+        return nombre
 
 
 class EmpleadoForm(FormEstilado):

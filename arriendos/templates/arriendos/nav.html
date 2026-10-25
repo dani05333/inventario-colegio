@@ -1,0 +1,16 @@
+      <div class="nav-section"><span>Arriendos</span></div>
+      <ul class="side-nav">
+        <li><a href="{% url 'arriendos:agenda' %}" title="Agenda y avisos" class="{% if n == 'agenda' %}active{% endif %}"><i class="bi bi-bell"></i><span>Agenda y avisos</span></a></li>
+        <li><a href="{% url 'arriendos:calendario' %}" title="Calendario" class="{% if n == 'calendario' %}active{% endif %}"><i class="bi bi-calendar3"></i><span>Calendario</span></a></li>
+        <li><a href="{% url 'arriendos:lista' %}" title="Arriendos" class="{% if n in 'lista detalle nuevo editar' %}active{% endif %}"><i class="bi bi-journal-text"></i><span>Arriendos</span></a></li>
+        <li><a href="{% url 'arriendos:disponibilidad' %}" title="Disponibilidad por fecha" class="{% if n == 'disponibilidad' %}active{% endif %}"><i class="bi bi-check2-square"></i><span>Disponibilidad</span></a></li>
+        <li><a href="{% url 'arriendos:clientes' %}" title="Clientes" class="{% if n in 'clientes cliente cliente_nuevo cliente_editar' %}active{% endif %}"><i class="bi bi-people"></i><span>Clientes</span></a></li>
+        {% include 'partials/nav_bloquear.html' %}
+      </ul>
+
+      <div class="nav-section"><span>Trajes</span></div>
+      <ul class="side-nav">
+        <li><a href="{% url 'arriendos:inventario' %}" title="Inventario de trajes" class="{% if n in 'inventario pieza_nueva pieza_editar traje_nuevo traje_editar' %}active{% endif %}"><i class="bi bi-box-seam"></i><span>Inventario de trajes{% if not ACCESO_ADMIN %} <i class="bi bi-lock-fill nav-candado" title="Pide la clave de administrador"></i>{% endif %}</span></a></li>
+        <li><a href="{% url 'arriendos:categorias' %}" title="Categorías" class="{% if n in 'categorias categoria_nueva categoria_editar categoria_eliminar' %}active{% endif %}"><i class="bi bi-tags"></i><span>Categorías</span></a></li>
+      </ul>
+

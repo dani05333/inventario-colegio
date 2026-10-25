@@ -21,5 +21,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('libreria/', include('libreria.urls')),
     path('egresos/', include('egresos.urls')),
+    path('arriendos/', include('arriendos.urls')),
     path('',include('AppInventario.urls')),
 ]

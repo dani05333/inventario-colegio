@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block title %}{% if c %}Editar{% else %}Nuevo{% endif %} cliente{% endblock %}
+{% block page_title %}Clientes de arriendos{% endblock %}
+{% block page_subtitle %}{% if c %}Editando a {{ c }}{% else %}Agregar un cliente{% endif %}{% endblock %}
+
+{% block content %}
+<div class="form-shell" style="max-width:680px">
+  <a href="{% if c %}{% url 'arriendos:cliente' c.pk %}{% else %}{% url 'arriendos:clientes' %}{% endif %}" class="d-inline-flex align-items-center gap-1 mb-3 text-secondary"><i class="bi bi-arrow-left"></i> Volver</a>
+  <form method="post" class="panel" novalidate>
+    {% csrf_token %}
+    <div class="panel-body">
+      {{ form.non_field_errors }}
+      <div class="row g-3">
+        {% for field in form %}<div class="{% if field.name == 'notas' %}col-12{% else %}col-md-6{% endif %}"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}
+      </div>
+    </div>
+    <div class="modal-footer justify-content-end"><button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Guardar</button></div>
+  </form>
+</div>
+{% endblock %}

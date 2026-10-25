@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% block title %}Calendario{% endblock %}
+{% block page_title %}Calendario de arriendos{% endblock %}
+{% block page_subtitle %}Toca un día para ver quién tiene trajes y cuántos quedan libres{% endblock %}
+{% block topbar_actions %}
+<div class="d-flex align-items-center gap-2">
+  <a class="btn btn-light-border btn-sm" href="?mes={{ mes_anterior }}" title="Mes anterior"><i class="bi bi-chevron-left"></i></a>
+  <span class="fw-bold px-1" style="min-width:140px;text-align:center">{{ nombre_mes }}</span>
+  <a class="btn btn-light-border btn-sm" href="?mes={{ mes_siguiente }}" title="Mes siguiente"><i class="bi bi-chevron-right"></i></a>
+  {% if not es_mes_actual %}<a class="btn btn-link btn-sm" href="?">Hoy</a>{% endif %}
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+  .cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+  .cal .cab { text-align: center; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; padding: 4px 0; }
+  .celda { display: flex; flex-direction: column; gap: 3px; min-height: 104px; padding: 8px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); text-decoration: none; transition: border-color .12s; }
+  .celda:hover { border-color: var(--primary); color: var(--text); }
+  .celda.fuera { opacity: .4; }
+  .celda.hoy { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
+  .celda.elegido { background: var(--primary-50); border-color: var(--primary); }
+  .celda.exceso { border-color: #f04438; background: #fef3f2; }
+  .celda .num { font-weight: 800; font-size: 15px; }
+  .celda .et { font-size: 11.5px; font-weight: 600; border-radius: 6px; padding: 1px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .et.sale { background: var(--primary-100); color: var(--primary-600); }
+  .et.vuelve { background: #dcfae6; color: #067647; }
+  .et.uso { color: var(--text-2); padding-left: 0; }
+  .et.mal { background: #f04438; color: #fff; }
+  .leyenda { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--text-2); margin: 10px 0 18px; }
+  .leyenda span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; background: var(--c); }
+  @media (max-width: 767.98px) { .celda { min-height: 70px; padding: 5px; } .celda .et { font-size: 10px; } }
+  .dos-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  @media (max-width: 1099.98px) { .dos-col { grid-template-columns: 1fr; } }
+  .libres-0 { color: #b42318; font-weight: 800; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cal">
+  {% for d in dias_semana %}<div class="cab">{{ d }}</div>{% endfor %}
+  {% for semana in semanas %}{% for c in semana %}
+  <a href="?mes={{ mes_param }}&dia={{ c.dia|date:'Y-m-d' }}#dia" class="celda {% if not c.del_mes %}fuera{% endif %} {% if c.hoy %}hoy{% endif %} {% if detalle and detalle.dia == c.dia %}elegido{% endif %} {% if c.exceso %}exceso{% endif %}"
+     title="{% if c.exceso %}Arrendado de más: {{ c.exceso|join:', ' }}{% endif %}">
+    <span class="num">{{ c.dia.day }}</span>
+    {% if c.exceso %}<span class="et mal"><i class="bi bi-exclamation-triangle-fill"></i> de más</span>{% endif %}
+    {% if c.retiros %}<span class="et sale"><i class="bi bi-arrow-up-right"></i> {{ c.retiros|length }} retir{{ c.retiros|length|pluralize:"o,os" }}</span>{% endif %}
+    {% if c.devoluciones %}<span class="et vuelve"><i class="bi bi-arrow-down-left"></i> {{ c.devoluciones|length }} devuelve{{ c.devoluciones|length|pluralize:",n" }}</span>{% endif %}
+    {% if c.en_uso %}<span class="et uso">{{ c.en_uso }} prenda{{ c.en_uso|pluralize }} fuera</span>{% endif %}
+  </a>
+  {% endfor %}{% endfor %}
+</div>
+<div class="leyenda">
+  <span style="--c:var(--primary-100)">retiran ese día</span><span style="--c:#dcfae6">devuelven ese día</span><span style="--c:#f04438">arrendado de más</span>
+</div>
+
+{% if detalle %}
+<div id="dia" class="dos-col">
+  <div class="panel">
+    <div class="panel-header"><div><h2 class="panel-title">{{ detalle.nombre|capfirst }}</h2><p class="panel-sub">Arriendos que tienen trajes ese día</p></div>
+      <a href="{% url 'arriendos:nuevo' %}?fecha={{ detalle.dia|date:'Y-m-d' }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Arriendo para este día</a></div>
+    <div class="panel-body pt-0">
+      {% for a in detalle.arriendos %}
+      <a href="{% url 'arriendos:detalle' a.pk %}" class="d-flex justify-content-between gap-2 py-2 border-bottom text-reset">
+        <span><strong>{{ a.cliente }}</strong>{% if a.evento %} · {{ a.evento }}{% endif %}<br>
+          <span class="small text-secondary">{% for l in a.lineas.all %}{{ l.cantidad }} × {{ l.nombre }}{% if not forloop.last %} · {% endif %}{% endfor %}</span></span>
+        <span class="text-end small text-nowrap"><span class="badge-soft {% if a.estado == 'entregado' %}badge-ok{% else %}badge-muted{% endif %}">{{ a.get_estado_display }}</span><br>
+          <span class="text-secondary">{{ a.fecha_retiro|date:'d/m' }} → {{ a.fecha_devolucion|date:'d/m' }}</span></span>
+      </a>
+      {% empty %}
+      <div class="small text-secondary py-3">Nadie tiene trajes ese día: está todo disponible.</div>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-header"><div><h2 class="panel-title">Disponibles ese día</h2><p class="panel-sub">Lo que queda libre para arrendar</p></div></div>
+    <div class="table-responsive">
+      <table class="table-app">
+        <thead><tr><th>Traje o pieza</th><th class="num">Libres</th></tr></thead>
+        <tbody>
+          {% for t in detalle.disp.trajes %}<tr><td><strong>{{ t.nombre }}</strong> <span class="badge-soft badge-muted">completo</span></td><td class="num {% if t.disponibles <= 0 %}libres-0{% endif %}">{{ t.disponibles }}</td></tr>{% endfor %}
+          {% for p in detalle.disp.piezas %}<tr><td>{{ p.nombre }}{% if p.figurin %} <span class="badge-soft badge-ok">figurín</span>{% endif %}</td><td class="num {% if p.disponibles <= 0 %}libres-0{% endif %}">{{ p.disponibles }} <span class="text-secondary small">de {{ p.stock }}</span></td></tr>{% endfor %}
+          {% if not detalle.disp.trajes and not detalle.disp.piezas %}<tr><td colspan="2" class="small text-secondary py-3">Aún no hay trajes en el inventario.</td></tr>{% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

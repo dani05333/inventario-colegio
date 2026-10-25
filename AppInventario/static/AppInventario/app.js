@@ -58,6 +58,12 @@ const App = (function () {
       lineas: [],
       pie: '¡Gracias por su compra!',
     },
+    arriendos: {
+      nombre: 'Chloe Arriendos',
+      bajada: 'Arriendo de trajes folclóricos',
+      lineas: [],
+      pie: 'Cuide los trajes y devuélvalos en la fecha indicada. ¡Gracias!',
+    },
   };
 
   /* Rollo de la impresora de boletas (se elige en Sistema → Impresora de boletas).
@@ -187,7 +193,7 @@ const App = (function () {
         <div class="center">${esc(NEGOCIO.bajada)}</div>
         ${NEGOCIO.lineas.map(l => `<div class="center">${esc(l)}</div>`).join('')}
         <hr>
-        <div><strong>Boleta N° ${esc(venta.folio ?? venta.id ?? "—")}</strong></div>
+        <div><strong>${esc(venta.titulo || "Boleta")} N° ${esc(venta.folio ?? venta.id ?? "—")}</strong></div>
         <div>${esc(formatDateTime(venta.fecha))}</div>
         ${venta.anulada ? `<div class="center total" style="margin-top:6px">*** VENTA ANULADA ***</div>
         <div class="center">${esc(formatDateTime(venta.fecha_anulacion))}${venta.motivo_anulacion ? ' · ' + esc(venta.motivo_anulacion) : ''}</div>` : ''}
@@ -198,7 +204,9 @@ const App = (function () {
           <tr><td>Unidades</td><td class="r">${unidades}</td></tr>
           <tr class="total"><td>TOTAL</td><td class="r">${money(venta.total)}</td></tr>
           ${pago}
+          ${(venta.extras || []).map(x => `<tr${x.destacar ? ' class="total"' : ''}><td>${esc(x.t)}</td><td class="r">${esc(x.v)}</td></tr>`).join('')}
         </table>
+        ${(venta.leyenda || []).map(l => `<div class="center" style="margin-top:4px">${esc(l)}</div>`).join('')}
         <hr>
         <div class="center">${esc(NEGOCIO.pie)}</div>
       </div>`;

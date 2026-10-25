@@ -7,6 +7,7 @@ PROTEGIDAS = {
     'ver_inventario', 'crear_inventario', 'editar_inventario', 'eliminar_inventario', 'carga_rapida',
     'libreria:historial', 'libreria:inventario', 'libreria:producto_nuevo', 'libreria:producto_editar',
     'libreria:producto_eliminar', 'libreria:ingreso',
+    'arriendos:inventario', 'arriendos:pieza_nueva', 'arriendos:pieza_editar', 'arriendos:traje_nuevo', 'arriendos:traje_editar',
 }
 SECCIONES_PROTEGIDAS = {'egresos'}
 # Páginas que se abren aparte sin que la persona deje la sección protegida

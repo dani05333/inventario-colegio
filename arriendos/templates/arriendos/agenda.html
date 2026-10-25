@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% block title %}Agenda y avisos{% endblock %}
+{% block page_title %}Agenda de arriendos{% endblock %}
+{% block page_subtitle %}Lo que hay que tener listo y lo que debe volver{% endblock %}
+{% block topbar_actions %}<a href="{% url 'arriendos:nuevo' %}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Nuevo arriendo</a>{% endblock %}
+
+{% block extra_head %}
+<style>
+  .aviso { display: flex; gap: 14px; align-items: flex-start; border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; border: 1px solid; }
+  .aviso i.ico { font-size: 22px; flex: none; margin-top: 1px; }
+  .aviso.rojo { background: #fef3f2; border-color: #fecdca; color: #912018; }
+  .aviso.ambar { background: #fffaeb; border-color: #fedf89; color: #93370d; }
+  .aviso a { color: inherit; text-decoration: underline; font-weight: 600; }
+  .dia-retiro { border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; background: var(--surface); }
+  .dia-retiro.hoy { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-100); }
+  .dia-retiro h3 { font-size: 16px; font-weight: 700; margin: 0 0 6px; }
+  .chip-traje { display: inline-block; background: var(--primary-50); color: var(--primary); border-radius: 999px; padding: 3px 10px; font-weight: 700; font-size: 13.5px; margin: 0 6px 6px 0; }
+  .fila-a { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-top: 1px dashed var(--border); font-size: 14px; }
+  .dos-col { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  @media (max-width: 1099.98px) { .dos-col { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+{% for s in sobre %}
+<div class="aviso rojo"><i class="bi bi-exclamation-octagon-fill ico"></i><div>
+  <strong>¡Arrendado de más el {{ s.nombre }}!</strong>
+  {% for p, ocupadas, stock in s.exceso %}<div>«{{ p }}»: hay {{ ocupadas }} arrendados y solo tienen {{ stock }}.</div>{% endfor %}
+  <a href="{% url 'arriendos:calendario' %}?mes={{ s.dia|date:'Y-m' }}&dia={{ s.dia|date:'Y-m-d' }}">Ver ese día en el calendario</a>
+</div></div>
+{% endfor %}
+{% for a in atrasados %}
+<div class="aviso rojo"><i class="bi bi-clock-history ico"></i><div><strong>Atrasado:</strong> {{ a.cliente }} debía devolver el {{ a.fecha_devolucion|date:'d/m' }} ({{ a.unidades }} prenda{{ a.unidades|pluralize }}).
+  {% if a.cliente.telefono %}Teléfono {{ a.cliente.telefono }}.{% endif %} <a href="{% url 'arriendos:detalle' a.pk %}">Ver {{ a.folio }}</a></div></div>
+{% endfor %}
+{% for a in no_retirados %}
+<div class="aviso ambar"><i class="bi bi-question-circle-fill ico"></i><div><strong>No retiraron:</strong> {{ a.cliente }} tenía que retirar el {{ a.fecha_retiro|date:'d/m' }}. Si no vendrá, cancela la reserva para liberar los trajes.
+  <a href="{% url 'arriendos:detalle' a.pk %}">Ver {{ a.folio }}</a></div></div>
+{% endfor %}
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3"><div class="stat"><div class="stat-label">Prendas arrendadas ahora</div><div class="stat-value">{{ en_uso_hoy }}</div><div class="stat-foot">entregadas y aún no devueltas</div></div></div>
+  <div class="col-6 col-lg-3"><div class="stat"><div class="stat-label">Retiros próximos 7 días</div><div class="stat-value">{{ retiros|length }}</div><div class="stat-foot">días con entregas</div></div></div>
+  <div class="col-6 col-lg-3"><div class="stat"><div class="stat-label">Devuelven hoy o mañana</div><div class="stat-value">{{ devoluciones|length }}</div></div></div>
+  <div class="col-6 col-lg-3"><div class="stat"><div class="stat-label">Atrasados</div><div class="stat-value {% if atrasados %}text-danger{% endif %}">{{ atrasados|length }}</div></div></div>
+</div>
+
+<div class="dos-col">
+  <div>
+    <h2 class="h6 fw-bold text-uppercase text-secondary mb-3"><i class="bi bi-bell me-1"></i>Recuerda tener listos</h2>
+    {% for r in retiros %}
+    <div class="dia-retiro {% if r.hoy %}hoy{% endif %}">
+      <h3>{% if r.hoy %}Hoy, {% elif r.manana %}Mañana, {% endif %}{{ r.nombre }}</h3>
+      <div>{% for nombre, cant in r.resumen %}<span class="chip-traje">{{ cant }} × {{ nombre }}</span>{% endfor %}</div>
+      {% for a in r.arriendos %}
+      <div class="fila-a"><a href="{% url 'arriendos:detalle' a.pk %}" class="text-reset"><strong>{{ a.cliente }}</strong>{% if a.evento %} · {{ a.evento }}{% endif %}</a>
+        <span class="text-secondary text-nowrap">{{ a.folio }} · vuelve {{ a.fecha_devolucion|date:'d/m' }}</span></div>
+      {% endfor %}
+    </div>
+    {% empty %}
+    <div class="empty py-4"><i class="bi bi-calendar-check"></i><strong>No hay retiros en los próximos 7 días</strong><a href="{% url 'arriendos:nuevo' %}">Registra un arriendo</a></div>
+    {% endfor %}
+  </div>
+
+  <div class="d-flex flex-column gap-4">
+    <div class="panel">
+      <div class="panel-header"><div><h2 class="panel-title"><i class="bi bi-box-arrow-in-down me-1"></i>Devuelven hoy o mañana</h2></div></div>
+      <div class="panel-body pt-0">
+        {% for a in devoluciones %}
+        <div class="fila-a"><a href="{% url 'arriendos:detalle' a.pk %}" class="text-reset"><strong>{{ a.cliente }}</strong> · {{ a.unidades }} prenda{{ a.unidades|pluralize }}</a><span class="text-secondary">{{ a.fecha_devolucion|date:'D d/m' }}</span></div>
+        {% empty %}<div class="small text-secondary py-2">Nadie devuelve hoy ni mañana.</div>{% endfor %}
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><div><h2 class="panel-title"><i class="bi bi-cash-coin me-1"></i>Reservas sin abono</h2><p class="panel-sub">Retiran en los próximos 7 días y aún no pagan nada</p></div></div>
+      <div class="panel-body pt-0">
+        {% for a in sin_abono %}
+        <div class="fila-a"><a href="{% url 'arriendos:detalle' a.pk %}" class="text-reset"><strong>{{ a.cliente }}</strong>{% if a.cliente.telefono %} · {{ a.cliente.telefono }}{% endif %}</a><span class="text-secondary">retira {{ a.fecha_retiro|date:'d/m' }}</span></div>
+        {% empty %}<div class="small text-secondary py-2">Todas las reservas próximas tienen abono.</div>{% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
