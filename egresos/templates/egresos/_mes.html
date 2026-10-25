@@ -1,0 +1,8 @@
+<div class="d-flex align-items-center gap-2 mes-nav">
+  <a class="btn btn-light-border btn-sm" href="?mes={{ mes_anterior }}{{ extra_params|default:'' }}" title="Mes anterior"><i class="bi bi-chevron-left"></i></a>
+  <form method="get" class="m-0">
+    <input type="month" name="mes" value="{{ mes_param }}" class="form-control form-control-sm fw-semibold" style="width:auto" onchange="this.form.submit()" aria-label="Mes">
+  </form>
+  <a class="btn btn-light-border btn-sm" href="?mes={{ mes_siguiente }}{{ extra_params|default:'' }}" title="Mes siguiente"><i class="bi bi-chevron-right"></i></a>
+  {% if not es_mes_actual %}<a class="btn btn-link btn-sm" href="?">Ir al mes actual</a>{% endif %}
+</div>

@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+{% block title %}{{ emp }}{% endblock %}
+{% block page_title %}{{ emp }}{% endblock %}
+{% block page_subtitle %}{{ emp.cargo|default:'Empleado' }} · {% if emp.tipo_pago == 'mensual' %}sueldo fijo{% else %}pago por hora{% endif %}{% if not emp.activo %} · ya no trabaja{% endif %}{% endblock %}
+{% block topbar_actions %}{% include 'egresos/_mes.html' %}<a href="{% url 'egresos:empleado_editar' emp.pk %}" class="btn btn-light-border ms-2"><i class="bi bi-pencil me-1"></i>Editar datos</a>{% endblock %}
+
+{% block extra_head %}
+<style>
+  .dos-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+  @media (max-width: 1099.98px) { .dos-col { grid-template-columns: 1fr; } }
+  .mini-form .form-label { font-size: 13px; margin-bottom: 4px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<a href="{% url 'egresos:empleados' %}?mes={{ mes_param }}" class="d-inline-flex align-items-center gap-1 mb-3 text-secondary"><i class="bi bi-arrow-left"></i> Todos los empleados</a>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3"><div class="stat"><div class="stat-label">Horas en {{ nombre_mes|lower }}</div><div class="stat-value">{{ r.horas|floatformat:"-2" }}</div>{% if emp.tipo_pago == 'hora' %}<div class="stat-foot">a <span data-monto="{{ emp.valor_hora }}"></span> la hora</div>{% endif %}</div></div>
+  <div class="col-6 col-lg-3"><div class="stat"><div class="stat-label">Sueldo del mes</div><div class="stat-value" data-monto="{{ r.sueldo }}"></div><div class="stat-foot">{% if emp.tipo_pago == 'mensual' %}sueldo fijo{% else %}horas × valor hora{% endif %}</div></div></div>
+  <div class="col-6 col-lg-3"><div class="stat"><div class="stat-label">Pagado del sueldo</div><div class="stat-value" data-monto="{{ r.pagado_sueldo }}"></div><div class="stat-foot">{% if r.adelantos %}incluye <span data-monto="{{ r.adelantos }}"></span> en adelantos{% else %}sueldo y adelantos{% endif %}{% if r.bonos %} · bonos aparte: <span data-monto="{{ r.bonos }}"></span>{% endif %}</div></div></div>
+  <div class="col-6 col-lg-3"><div class="stat"><div class="stat-label">Falta pagar</div><div class="stat-value {% if r.pendiente %}text-danger{% endif %}" data-monto="{{ r.pendiente }}"></div></div></div>
+</div>
+
+<div class="dos-col">
+  <div class="panel" id="horas">
+    <div class="panel-header"><div><h2 class="panel-title"><i class="bi bi-clock me-1"></i>Horas trabajadas</h2><p class="panel-sub">{% if emp.tipo_pago == 'hora' %}Con estas horas se calcula el sueldo del mes.{% else %}Solo como registro: el sueldo es fijo.{% endif %}</p></div></div>
+    <form method="post" class="panel-body mini-form border-bottom" novalidate>
+      {% csrf_token %}<input type="hidden" name="accion" value="horas">
+      <div class="row g-2 align-items-end">
+        <div class="col-5"><label class="form-label" for="{{ form_horas.fecha.id_for_label }}">Fecha</label>{{ form_horas.fecha }}</div>
+        <div class="col-3"><label class="form-label" for="{{ form_horas.horas.id_for_label }}">Horas</label>{{ form_horas.horas }}</div>
+        <div class="col-4"><button type="submit" class="btn btn-primary w-100"><i class="bi bi-plus-lg"></i> Anotar</button></div>
+        <div class="col-12">{{ form_horas.nota }}</div>
+      </div>
+      {{ form_horas.non_field_errors }}{{ form_horas.horas.errors }}{{ form_horas.fecha.errors }}
+    </form>
+    <div class="table-responsive">
+      <table class="table-app">
+        <thead><tr><th>Fecha</th><th class="num">Horas</th><th>Nota</th><th></th></tr></thead>
+        <tbody>
+          {% for h in horas %}
+          <tr><td>{{ h.fecha|date:'D d/m' }}</td><td class="num fw-semibold">{{ h.horas|floatformat:"-2" }}</td><td class="text-secondary">{{ h.nota }}</td>
+              <td class="text-end"><button class="btn-icon danger js-borrar" data-url="{% url 'egresos:horas_eliminar' h.pk %}" title="Eliminar"><i class="bi bi-trash3"></i></button></td></tr>
+          {% empty %}
+          <tr><td colspan="4" class="text-secondary small py-3">Sin horas anotadas en {{ nombre_mes|lower }}.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel" id="pagos">
+    <div class="panel-header"><div><h2 class="panel-title"><i class="bi bi-cash-stack me-1"></i>Pagos de {{ nombre_mes|lower }}</h2><p class="panel-sub">Sueldo, adelantos y bonos. Cuentan como egresos del día en que se pagan.</p></div></div>
+    <form method="post" class="panel-body mini-form border-bottom" novalidate>
+      {% csrf_token %}<input type="hidden" name="accion" value="pago">
+      <div class="row g-2 align-items-end">
+        <div class="col-6 col-md-4"><label class="form-label" for="{{ form_pago.fecha.id_for_label }}">Fecha del pago</label>{{ form_pago.fecha }}</div>
+        <div class="col-6 col-md-4"><label class="form-label" for="{{ form_pago.periodo.id_for_label }}">{{ form_pago.periodo.label }}</label>{{ form_pago.periodo }}</div>
+        <div class="col-6 col-md-4"><label class="form-label" for="{{ form_pago.tipo.id_for_label }}">Tipo</label>{{ form_pago.tipo }}</div>
+        <div class="col-6 col-md-4"><label class="form-label" for="{{ form_pago.monto.id_for_label }}">Monto</label>{{ form_pago.monto }}</div>
+        <div class="col-6 col-md-4"><label class="form-label" for="{{ form_pago.metodo_pago.id_for_label }}">{{ form_pago.metodo_pago.label }}</label>{{ form_pago.metodo_pago }}</div>
+        <div class="col-6 col-md-4"><button type="submit" class="btn btn-primary w-100"><i class="bi bi-plus-lg"></i> Registrar pago</button></div>
+        <div class="col-12">{{ form_pago.nota }}</div>
+      </div>
+      {{ form_pago.non_field_errors }}{{ form_pago.monto.errors }}{{ form_pago.periodo.errors }}
+      {% if r.pendiente %}<div class="field-help mt-1">El monto parte con lo que falta pagar del sueldo (<span data-monto="{{ r.pendiente }}"></span>).</div>{% endif %}
+    </form>
+    <div class="table-responsive">
+      <table class="table-app">
+        <thead><tr><th>Fecha</th><th>Tipo</th><th>Pago</th><th class="num">Monto</th><th></th></tr></thead>
+        <tbody>
+          {% for p in pagos %}
+          <tr><td>{{ p.fecha|date:'d/m/Y' }}</td><td><span class="badge-soft {% if p.tipo == 'sueldo' %}badge-ok{% else %}badge-muted{% endif %}">{{ p.get_tipo_display }}</span>{% if p.nota %} <span class="small text-secondary">{{ p.nota }}</span>{% endif %}</td>
+              <td>{{ p.get_metodo_pago_display }}</td><td class="num fw-semibold" data-monto="{{ p.monto }}"></td>
+              <td class="text-end"><button class="btn-icon danger js-borrar" data-url="{% url 'egresos:pago_eliminar' p.pk %}" title="Eliminar"><i class="bi bi-trash3"></i></button></td></tr>
+          {% empty %}
+          <tr><td colspan="5" class="text-secondary small py-3">Sin pagos de {{ nombre_mes|lower }}.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const CSRF = '{{ csrf_token }}';
+document.querySelectorAll('[data-monto]').forEach(el => { el.textContent = App.money(el.dataset.monto); });
+$('.js-borrar').on('click', function () {
+  if (!confirm('¿Eliminar este registro?')) return;
+  $.ajax({ url: this.dataset.url, method: 'POST', headers: { 'X-CSRFToken': CSRF } })
+    .done(() => location.reload())
+    .fail(() => App.toast('No se pudo eliminar', 'error'));
+});
+</script>
+{% endblock %}

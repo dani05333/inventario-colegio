@@ -68,7 +68,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.humanize',
-    'AppInventario'
+    'AppInventario',
+    'libreria',   # Chloe Librería: su propio punto de venta e inventario
+    'egresos',    # gastos del negocio y sueldos
 ]
 
 MIDDLEWARE = [

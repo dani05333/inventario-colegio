@@ -1,0 +1,8 @@
+        {% if ACCESO_ADMIN and TIENE_CLAVE %}
+        <li>
+          <form method="post" action="{% url 'cerrar_acceso' %}" class="m-0">{% csrf_token %}
+            <input type="hidden" name="volver" value="{% url SECCION.inicio %}">
+            <button type="submit" class="nav-bloquear" title="Volver a bloquear lo que pide la clave de administrador"><i class="bi bi-lock"></i><span>{% if SECCION.clave == 'egresos' %}Bloquear egresos{% else %}Bloquear vista de ventas{% endif %}</span></button>
+          </form>
+        </li>
+        {% endif %}

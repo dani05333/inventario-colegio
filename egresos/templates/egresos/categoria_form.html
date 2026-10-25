@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block title %}{% if form.instance.pk %}Editar{% else %}Nueva{% endif %} categoría{% endblock %}
+{% block page_title %}Categorías de gasto{% endblock %}
+{% block page_subtitle %}{% if form.instance.pk %}Editando «{{ form.instance }}»{% else %}Agregar una categoría{% endif %}{% endblock %}
+
+{% block content %}
+{% url 'egresos:categorias' as volver_url %}
+{% include 'partials/form_simple.html' with singular='Categoría' plural='Categorías' nuevo_txt='Nueva categoría' %}
+{% endblock %}

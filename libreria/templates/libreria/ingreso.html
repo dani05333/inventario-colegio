@@ -1,0 +1,211 @@
+{% extends 'base.html' %}
+{% block title %}Ingreso rápido{% endblock %}
+{% block page_title %}Ingreso rápido de mercadería{% endblock %}
+{% block page_subtitle %}Escanea lo que llegó: suma stock a lo que ya existe y crea lo nuevo en el momento{% endblock %}
+
+{% block extra_head %}
+<style>
+  .ing-buscar { position: relative; }
+  .ing-buscar i.bi-upc-scan { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); font-size: 22px; color: var(--primary); }
+  .ing-buscar input { height: 58px; padding-left: 52px; font-size: 18px; border-radius: 14px; }
+  .nuevo-card { border: 2px solid var(--primary); border-radius: 16px; background: var(--primary-50); padding: 18px; margin-top: 14px; }
+  #lista td { vertical-align: middle; }
+  #lista .form-control { width: 110px; }
+  .qty { display: inline-flex; align-items: center; gap: 4px; }
+  .qty button { width: 30px; height: 32px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); font-weight: 700; }
+  .qty input { width: 64px !important; text-align: center; }
+  .flash { animation: flash .8s ease; }
+  @keyframes flash { from { background: var(--primary-100); } to { background: transparent; } }
+  .ing-pie { position: sticky; bottom: 0; background: var(--surface); border-top: 1px solid var(--border); padding: 14px 20px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; border-radius: 0 0 16px 16px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="max-width:1100px">
+  <div class="alert alert-success d-none" id="listo"></div>
+
+  <div class="panel mb-3">
+    <div class="panel-body">
+      <div class="ing-buscar">
+        <i class="bi bi-upc-scan"></i>
+        <input type="text" id="scan" class="form-control" placeholder="Escanea el código del producto (o escríbelo y presiona Enter)" autocomplete="off" autofocus>
+      </div>
+      <div class="d-flex flex-wrap justify-content-between gap-2 mt-2">
+        <span class="small text-secondary">Cada vez que escaneas el mismo producto, suma 1. También puedes cambiar la cantidad a mano.</span>
+        <button type="button" class="btn btn-sm btn-light-border" id="btn-sin-codigo"><i class="bi bi-plus-lg me-1"></i>Producto que no trae código</button>
+      </div>
+
+      <!-- Producto nuevo (código que no está en el inventario) -->
+      <div class="nuevo-card d-none" id="nuevo">
+        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+          <div><h3 class="h6 fw-bold mb-0">Producto nuevo</h3><div class="small text-secondary" id="nv-info"></div></div>
+          <button type="button" class="btn-close" id="nv-cerrar" aria-label="Cerrar"></button>
+        </div>
+        <div class="row g-2">
+          <div class="col-md-3"><label class="form-label small mb-1" for="nv-codigo">Código</label><input type="text" class="form-control" id="nv-codigo" placeholder="Se genera solo"></div>
+          <div class="col-md-5"><label class="form-label small mb-1" for="nv-nombre">Nombre *</label><input type="text" class="form-control" id="nv-nombre" maxlength="150" placeholder="Ej: Cuaderno universitario 100 hojas"></div>
+          <div class="col-md-2"><label class="form-label small mb-1" for="nv-marca">Marca</label><input type="text" class="form-control" id="nv-marca" maxlength="80"></div>
+          <div class="col-md-2"><label class="form-label small mb-1" for="nv-categoria">Categoría</label>
+            <select class="form-select" id="nv-categoria"><option value="">Sin categoría</option>{% for c in categorias %}<option value="{{ c.id }}">{{ c.nombre }}</option>{% endfor %}</select></div>
+          <div class="col-6 col-md-2"><label class="form-label small mb-1" for="nv-precio">Precio venta *</label><input type="number" min="0" class="form-control" id="nv-precio"></div>
+          <div class="col-6 col-md-2"><label class="form-label small mb-1" for="nv-costo">Costo</label><input type="number" min="0" class="form-control" id="nv-costo"></div>
+          <div class="col-6 col-md-2"><label class="form-label small mb-1" for="nv-cantidad">Cantidad</label><input type="number" min="0" class="form-control" id="nv-cantidad" value="1"></div>
+          <div class="col-6 col-md-2"><label class="form-label small mb-1" for="nv-minimo">Avisar con</label><input type="number" min="0" class="form-control" id="nv-minimo" value="0" title="Avisa stock bajo cuando queden esta cantidad o menos (0 = sin aviso)"></div>
+          <div class="col-md-4 d-flex align-items-end"><button type="button" class="btn btn-primary w-100" id="nv-agregar"><i class="bi bi-plus-lg me-1"></i>Agregar a la lista <kbd class="key">Enter</kbd></button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header"><div><h2 class="panel-title">Lo que llegó <span class="badge-soft badge-muted ms-1" id="n-lineas">0</span></h2><p class="panel-sub">Revisa las cantidades. Si cambias el precio o el costo, se actualiza el producto.</p></div></div>
+    <div class="table-responsive">
+      <table class="table-app" id="lista">
+        <thead><tr><th>Producto</th><th class="num">Stock</th><th>Cantidad que llegó</th><th>Costo c/u</th><th>Precio venta</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="empty" id="vacio"><i class="bi bi-upc-scan"></i><strong>Aún no escaneas nada</strong>Escanea el primer producto arriba.</div>
+    </div>
+    <div class="ing-pie">
+      <span class="text-secondary" id="resumen">—</span>
+      <div class="d-flex gap-2">
+        <button type="button" class="btn btn-light-border" id="btn-limpiar">Vaciar lista</button>
+        <button type="button" class="btn btn-primary btn-lg" id="btn-guardar" disabled><i class="bi bi-check2-circle me-1"></i>Guardar ingreso</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const CSRF = '{{ csrf_token }}';
+const GUARDADO = 'libreria_ingreso';
+let productos = [], lista = [];   // lista: [{id?, nuevo?: {...}, codigo, nombre, marca, stock, cantidad, costo, precio}]
+const $scan = $('#scan');
+
+function guardarLista() { try { localStorage.setItem(GUARDADO, JSON.stringify(lista)); } catch (e) {} }   // por si se cierra la ventana a medias
+function leerLista() { try { lista = JSON.parse(localStorage.getItem(GUARDADO)) || []; } catch (e) { lista = []; } }
+
+function cargar() {
+  return $.getJSON("{% url 'libreria:productos_json' %}", { todos: 1 }).then(r => { productos = r.data; });
+}
+
+function pintar(flashCodigo) {
+  $('#lista tbody').html(lista.map((l, i) => `
+    <tr data-i="${i}" class="${l.codigo === flashCodigo ? 'flash' : ''}">
+      <td><div class="cell-strong">${App.esc(l.nombre)} ${l.nuevo ? '<span class="badge-soft badge-ok">nuevo</span>' : ''}</div>
+          <div class="cell-sub">${App.esc([l.marca, l.codigo || 'código se genera al guardar'].filter(Boolean).join(' · '))}</div></td>
+      <td class="num">${l.nuevo ? '—' : `${l.stock} → <strong>${l.stock + (l.cantidad || 0)}</strong>`}</td>
+      <td><div class="qty"><button type="button" class="js-menos">−</button><input type="number" min="0" class="form-control js-cant" value="${l.cantidad}"><button type="button" class="js-mas">+</button></div></td>
+      <td><input type="number" min="0" class="form-control js-costo" value="${l.costo ?? ''}" placeholder="—"></td>
+      <td><input type="number" min="0" class="form-control js-precio" value="${l.precio ?? ''}"></td>
+      <td class="text-end"><button type="button" class="btn-icon danger js-quitar" title="Quitar de la lista"><i class="bi bi-x-lg"></i></button></td>
+    </tr>`).join(''));
+  const unidades = lista.reduce((a, l) => a + (l.cantidad || 0), 0);
+  const nuevos = lista.filter(l => l.nuevo).length;
+  $('#n-lineas').text(lista.length);
+  $('#vacio').toggleClass('d-none', lista.length > 0);
+  $('#resumen').text(lista.length ? `${lista.length} producto${lista.length === 1 ? '' : 's'} · ${unidades} unidad${unidades === 1 ? '' : 'es'}${nuevos ? ` · ${nuevos} nuevo${nuevos === 1 ? '' : 's'}` : ''}` : '—');
+  $('#btn-guardar').prop('disabled', !lista.length);
+  guardarLista();
+}
+
+/* ---------- Escanear ---------- */
+function escanear(codigo) {
+  codigo = codigo.trim();
+  if (!codigo) return;
+  $('#listo').addClass('d-none');
+  const enLista = lista.find(l => l.codigo === codigo);
+  if (enLista) { enLista.cantidad = (enLista.cantidad || 0) + 1; pintar(codigo); return; }
+  const p = productos.find(x => x.codigo === codigo);
+  if (p) {
+    lista.unshift({ id: p.id, codigo: p.codigo, nombre: p.nombre, marca: p.marca, stock: p.stock, cantidad: 1, costo: null, precio: p.precio });
+    if (!p.activo) App.toast(`«${p.nombre}» estaba como «no se vende»: al guardar vuelve a estar a la venta`, 'info', 6000);
+    pintar(codigo);
+    return;
+  }
+  abrirNuevo(codigo);
+}
+
+async function abrirNuevo(codigo) {
+  $('#nuevo').removeClass('d-none');
+  $('#nv-codigo').val(codigo);
+  $('#nv-nombre, #nv-marca, #nv-precio, #nv-costo').val('');
+  $('#nv-cantidad').val(1); $('#nv-minimo').val(0);
+  $('#nv-nombre').focus();
+  if (!/^\d{8,14}$/.test(codigo)) { $('#nv-info').text(codigo ? 'Código no registrado.' : 'Se le generará un código interno para imprimirle una etiqueta.'); return; }
+  $('#nv-info').html('<span class="spinner-border spinner-border-sm me-1"></span>Código no registrado. Buscando el nombre en internet…');
+  try {
+    const r = await $.getJSON("{% url 'libreria:buscar_internet' %}", { codigo });
+    if ($('#nv-codigo').val() !== codigo) return;   // ya se escaneó otra cosa
+    if (r.encontrado) {
+      if (!$('#nv-nombre').val()) $('#nv-nombre').val(r.nombre);
+      if (!$('#nv-marca').val() && r.marca) $('#nv-marca').val(r.marca);
+      $('#nv-info').html('<i class="bi bi-check-circle-fill text-success me-1"></i>Nombre encontrado en internet: revísalo y pon el precio.');
+      $('#nv-precio').focus();
+    } else {
+      $('#nv-info').text('Código no registrado y no encontrado en internet: escribe el nombre.');
+    }
+  } catch (e) { $('#nv-info').text('Código no registrado. Escribe el nombre (no se pudo buscar en internet).'); }
+}
+
+function agregarNuevo() {
+  const nombre = $('#nv-nombre').val().replace(/\s+/g, ' ').trim();
+  const precio = $('#nv-precio').val();
+  if (!nombre) { App.toast('Escribe el nombre del producto', 'warning'); $('#nv-nombre').focus(); return; }
+  if (precio === '') { App.toast('Pon el precio de venta', 'warning'); $('#nv-precio').focus(); return; }
+  const codigo = $('#nv-codigo').val().trim();
+  if (codigo && (productos.some(p => p.codigo === codigo) || lista.some(l => l.codigo === codigo))) { App.toast('Ese código ya está en el inventario o en la lista', 'warning'); return; }
+  lista.unshift({
+    nuevo: true, codigo, nombre, marca: $('#nv-marca').val().trim(), categoria_id: $('#nv-categoria').val() || null,
+    stock: 0, cantidad: Math.max(0, parseInt($('#nv-cantidad').val()) || 0), precio: Number(precio),
+    costo: $('#nv-costo').val() === '' ? null : Number($('#nv-costo').val()), stock_minimo: Math.max(0, parseInt($('#nv-minimo').val()) || 0),
+  });
+  $('#nuevo').addClass('d-none');
+  pintar(codigo);
+  $scan.focus();
+}
+
+$scan.on('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); escanear($scan.val()); $scan.val(''); } });
+$('#btn-sin-codigo').on('click', () => abrirNuevo(''));
+$('#nv-agregar').on('click', agregarNuevo);
+$('#nuevo').on('keydown', 'input, select', e => { if (e.key === 'Enter') { e.preventDefault(); agregarNuevo(); } });
+$('#nv-cerrar').on('click', () => { $('#nuevo').addClass('d-none'); $scan.focus(); });
+
+/* ---------- Editar la lista ---------- */
+const fila = el => lista[Number($(el).closest('tr').data('i'))];
+$('#lista').on('click', '.js-mas', function () { fila(this).cantidad++; pintar(); });
+$('#lista').on('click', '.js-menos', function () { const l = fila(this); l.cantidad = Math.max(0, l.cantidad - 1); pintar(); });
+$('#lista').on('change', '.js-cant', function () { fila(this).cantidad = Math.max(0, parseInt(this.value) || 0); pintar(); });
+$('#lista').on('change', '.js-costo', function () { fila(this).costo = this.value === '' ? null : Math.max(0, Number(this.value)); guardarLista(); });
+$('#lista').on('change', '.js-precio', function () { fila(this).precio = this.value === '' ? null : Math.max(0, Number(this.value)); guardarLista(); });
+$('#lista').on('click', '.js-quitar', function () { lista.splice(Number($(this).closest('tr').data('i')), 1); pintar(); });
+$('#btn-limpiar').on('click', () => { if (lista.length && confirm('¿Vaciar la lista? No se guardará nada.')) { lista = []; pintar(); $scan.focus(); } });
+
+/* ---------- Guardar ---------- */
+$('#btn-guardar').on('click', function () {
+  const btn = $(this).prop('disabled', true);
+  $.ajax({
+    url: "{% url 'libreria:ingreso_guardar' %}", method: 'POST', contentType: 'application/json', headers: { 'X-CSRFToken': CSRF },
+    data: JSON.stringify({
+      existentes: lista.filter(l => !l.nuevo).map(l => ({ id: l.id, cantidad: l.cantidad, costo: l.costo, precio: l.precio })),
+      nuevos: lista.filter(l => l.nuevo).map(l => ({ codigo: l.codigo, nombre: l.nombre, marca: l.marca, categoria_id: l.categoria_id,
+                                                     precio: l.precio, costo: l.costo, cantidad: l.cantidad, stock_minimo: l.stock_minimo })),
+    })
+  }).done(async r => {
+    const unidades = r.sumados.reduce((a, s) => a + s.cantidad, 0) + r.creados.reduce((a, c) => a + c.cantidad, 0);
+    $('#listo').html(`<i class="bi bi-check-circle-fill me-1"></i><strong>Ingreso guardado:</strong> ${unidades} unidad${unidades === 1 ? '' : 'es'}
+      ${r.sumados.length ? ` · se sumó stock a ${r.sumados.length} producto${r.sumados.length === 1 ? '' : 's'}` : ''}
+      ${r.creados.length ? ` · ${r.creados.length} producto${r.creados.length === 1 ? '' : 's'} nuevo${r.creados.length === 1 ? '' : 's'}` : ''}.
+      <a class="ms-2 fw-semibold" href="{% url 'libreria:inventario' %}">Ver el inventario</a>`).removeClass('d-none');
+    lista = []; pintar();
+    await cargar();
+    $scan.focus();
+  }).fail(xhr => { App.toast((xhr.responseJSON && xhr.responseJSON.message) || 'No se pudo guardar el ingreso', 'error', 6000); btn.prop('disabled', false); });
+});
+
+leerLista();
+cargar().then(() => pintar());
+</script>
+{% endblock %}

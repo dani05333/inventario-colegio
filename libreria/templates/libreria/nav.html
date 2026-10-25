@@ -1,0 +1,14 @@
+      <div class="nav-section"><span>Ventas</span></div>
+      <ul class="side-nav">
+        <li><a href="{% url 'libreria:pos' %}" title="Punto de venta" class="{% if n == 'pos' %}active{% endif %}"><i class="bi bi-upc-scan"></i><span>Punto de venta</span></a></li>
+        <li><a href="{% url 'libreria:historial' %}" title="Historial de ventas" class="{% if n == 'historial' %}active{% endif %}"><i class="bi bi-receipt"></i><span>Historial de ventas</span></a></li>
+        {% include 'partials/nav_bloquear.html' %}
+      </ul>
+
+      <div class="nav-section"><span>Productos</span></div>
+      <ul class="side-nav">
+        <li><a href="{% url 'libreria:inventario' %}" title="Inventario" class="{% if n in 'inventario producto_nuevo producto_editar' %}active{% endif %}"><i class="bi bi-box-seam"></i><span>Inventario{% if not ACCESO_ADMIN %} <i class="bi bi-lock-fill nav-candado" title="Pide la clave de administrador"></i>{% endif %}</span></a></li>
+        <li><a href="{% url 'libreria:ingreso' %}" title="Ingreso rápido de mercadería" class="{% if n == 'ingreso' %}active{% endif %}"><i class="bi bi-upc"></i><span>Ingreso rápido{% if not ACCESO_ADMIN %} <i class="bi bi-lock-fill nav-candado" title="Pide la clave de administrador"></i>{% endif %}</span></a></li>
+        <li><a href="{% url 'libreria:categorias' %}" title="Categorías" class="{% if n in 'categorias categoria_nueva categoria_editar categoria_eliminar' %}active{% endif %}"><i class="bi bi-tags"></i><span>Categorías</span></a></li>
+      </ul>
+

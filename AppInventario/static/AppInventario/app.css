@@ -119,6 +119,39 @@ a:hover { color: var(--primary-600); }
   color: var(--text);
 }
 .brand:hover { color: var(--text); }
+/* El logo es un botón que despliega el selector de sección */
+button.brand { width: 100%; border: 0; background: transparent; text-align: left; cursor: pointer; }
+button.brand .brand-logo { transition: transform .2s, box-shadow .2s; }
+button.brand:hover .brand-logo { transform: scale(1.08); box-shadow: 0 0 0 3px var(--primary-100), 0 4px 12px rgba(20, 24, 40, .2); }
+.brand-flecha { margin-left: auto; color: var(--muted); font-size: 14px; }
+
+/* Colores de cada sección: uniformes (morado, el de :root), librería (verde azulado) y egresos (ámbar) */
+html[data-seccion="libreria"] { --primary: #0f766e; --primary-600: #0b5f59; --primary-50: #e7f5f3; --primary-100: #c9ebe6; }
+html[data-seccion="egresos"]  { --primary: #b45309; --primary-600: #92400e; --primary-50: #fdf3e6; --primary-100: #fae3c4; }
+
+/* Selector de sección: círculos que salen desde el logo del menú */
+.sec-switch { position: fixed; inset: 0; z-index: 1080; }
+.sec-fondo { position: absolute; inset: 0; background: rgba(15, 18, 30, .5); backdrop-filter: blur(3px); opacity: 0; transition: opacity .25s; }
+.sec-switch.abierto .sec-fondo { opacity: 1; }
+.sec-anclaje { position: absolute; left: 20px; top: 20px; }
+.sec-circulo {
+  position: absolute; left: 0; top: 0; display: block; padding: 0; border: 0; background: none; border-radius: 50%;
+  transform-origin: 24px 24px; transition: transform .5s cubic-bezier(.2, 1.25, .4, 1), opacity .25s; opacity: 0;
+}
+.sec-circulo img { display: block; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; background: #fff; border: 4px solid #fff; box-shadow: 0 12px 32px rgba(0, 0, 0, .35); transition: transform .2s; }
+.sec-circulo:hover img, .sec-circulo:focus-visible img { transform: scale(1.07); }
+.sec-circulo:focus-visible { outline: none; }
+.sec-circulo:focus-visible img { box-shadow: 0 0 0 4px var(--primary), 0 12px 32px rgba(0, 0, 0, .35); }
+.sec-nombre { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 10px; white-space: nowrap; text-align: center; color: #fff; font-weight: 700; font-size: 16px; text-shadow: 0 1px 6px rgba(0, 0, 0, .55); }
+.sec-nombre small { display: block; font-weight: 500; font-size: 12px; opacity: .85; }
+.sec-actual { width: 110px; height: 110px; transform: scale(.44); }
+.sec-otra { width: 132px; height: 132px; transform: translate(0, 0) scale(.3); }
+.sec-switch.abierto .sec-circulo { opacity: 1; }
+.sec-switch.abierto .sec-actual { transform: scale(1); }
+.sec-switch.abierto .sec-otra-1 { transform: translate(170px, -6px) scale(1); }
+.sec-switch.abierto .sec-otra-2 { transform: translate(96px, 196px) scale(1); transition-delay: .07s; }
+.sec-actual .sec-nombre small { opacity: .7; }
+@media (min-width: 992px) { html.rail .sec-anclaje { left: 14px; } }
 .brand-logo {   /* logo redondo de Chloe Creaciones */
   width: 48px; height: 48px; flex: none;
   border-radius: 50%; object-fit: cover;
@@ -176,7 +209,7 @@ a:hover { color: var(--primary-600); }
 @media (min-width: 992px) {
   html.rail { --sidebar-w: 76px; }
   html.rail .brand { justify-content: center; padding: 18px 0 14px; }
-  html.rail .brand-text,
+  html.rail .brand-text, html.rail .brand-flecha,
   html.rail .side-nav a span,
   html.rail .sidebar-cta .btn span,
   html.rail .rail-toggle span { display: none; }

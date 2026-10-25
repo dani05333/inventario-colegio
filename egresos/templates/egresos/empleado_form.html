@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block title %}{% if empleado %}Editar{% else %}Nuevo{% endif %} empleado{% endblock %}
+{% block page_title %}Empleados y sueldos{% endblock %}
+{% block page_subtitle %}{% if empleado %}Editando a {{ empleado }}{% else %}Agregar un empleado{% endif %}{% endblock %}
+
+{% block content %}
+<div class="form-shell" style="max-width:720px">
+  <a href="{% if empleado %}{% url 'egresos:empleado' empleado.pk %}{% else %}{% url 'egresos:empleados' %}{% endif %}" class="d-inline-flex align-items-center gap-1 mb-3 text-secondary"><i class="bi bi-arrow-left"></i> Volver</a>
+  <form method="post" class="panel" novalidate>
+    {% csrf_token %}
+    <div class="panel-body">
+      {{ form.non_field_errors }}
+      <div class="row g-3">
+        <div class="col-md-7"><label class="form-label" for="{{ form.nombre.id_for_label }}">Nombre</label>{{ form.nombre }}{{ form.nombre.errors }}</div>
+        <div class="col-md-5"><label class="form-label" for="{{ form.cargo.id_for_label }}">Cargo <span class="fw-normal text-secondary">(opcional)</span></label>{{ form.cargo }}</div>
+        <div class="col-md-4"><label class="form-label" for="{{ form.tipo_pago.id_for_label }}">{{ form.tipo_pago.label }}</label>{{ form.tipo_pago }}</div>
+        <div class="col-md-4 js-mensual"><label class="form-label" for="{{ form.sueldo_mensual.id_for_label }}">{{ form.sueldo_mensual.label }}</label>{{ form.sueldo_mensual }}{{ form.sueldo_mensual.errors }}</div>
+        <div class="col-md-4 js-hora"><label class="form-label" for="{{ form.valor_hora.id_for_label }}">{{ form.valor_hora.label }}</label>{{ form.valor_hora }}{{ form.valor_hora.errors }}</div>
+        <div class="col-md-4"><label class="form-label" for="{{ form.telefono.id_for_label }}">Teléfono</label>{{ form.telefono }}</div>
+        <div class="col-md-4"><label class="form-label" for="{{ form.fecha_ingreso.id_for_label }}">{{ form.fecha_ingreso.label }}</label>{{ form.fecha_ingreso }}</div>
+        <div class="col-md-4 d-flex align-items-end"><div class="form-check form-switch">{{ form.activo }}<label class="form-check-label" for="{{ form.activo.id_for_label }}">{{ form.activo.label }}</label></div></div>
+        <div class="col-12"><label class="form-label" for="{{ form.notas.id_for_label }}">Notas</label>{{ form.notas }}</div>
+      </div>
+    </div>
+    <div class="modal-footer justify-content-between">
+      <a href="{% url 'egresos:empleados' %}" class="btn btn-light-border">Cancelar</a>
+      <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Guardar</button>
+    </div>
+  </form>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const tipo = document.getElementById('{{ form.tipo_pago.id_for_label }}');
+  const mostrar = () => {
+    document.querySelector('.js-mensual').classList.toggle('d-none', tipo.value !== 'mensual');
+    document.querySelector('.js-hora').classList.toggle('d-none', tipo.value !== 'hora');
+  };
+  tipo.addEventListener('change', mostrar); mostrar();
+});
+</script>
+{% endblock %}

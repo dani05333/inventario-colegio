@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block title %}Categorías{% endblock %}
+{% block page_title %}Categorías{% endblock %}
+{% block page_subtitle %}Para ordenar y filtrar los productos de la librería{% endblock %}
+
+{% block content %}
+{% url 'libreria:categoria_nueva' as crear_url %}{% url 'libreria:categoria_editar' 0 as editar_url0 %}{% url 'libreria:categoria_eliminar' 0 as eliminar_url0 %}{% url 'libreria:categorias_json' as json_url %}
+{% include 'partials/catalogo.html' with singular='Categoría' plural='Categorías' ayuda='Por ejemplo: cuadernos, lápices, arte y manualidades, oficina.' %}
+{% endblock %}

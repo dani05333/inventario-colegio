@@ -1,0 +1,143 @@
+{% extends 'base.html' %}
+{% load static humanize %}
+{% block title %}Resumen del mes{% endblock %}
+{% block page_title %}Resumen de egresos{% endblock %}
+{% block page_subtitle %}{{ nombre_mes }}: cuánto se gastó, cuánto se pagó en sueldos y cómo queda contra lo vendido{% endblock %}
+{% block topbar_actions %}{% include 'egresos/_mes.html' %}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .hero { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; margin-bottom: 20px; }
+  .hero .stat-value { font-size: 26px; }
+  .var { font-size: 13px; font-weight: 600; }
+  .var.sube { color: #b42318; } .var.baja { color: #067647; }
+  .resultado.positivo .stat-value { color: #067647; } .resultado.negativo .stat-value { color: #b42318; }
+  .cat-fila { display: grid; grid-template-columns: minmax(120px, 1fr) 2fr auto; gap: 12px; align-items: center; padding: 7px 0; }
+  .cat-barra { height: 10px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+  .cat-barra span { display: block; height: 100%; border-radius: 999px; background: var(--primary); }
+  .cat-monto { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 110px; text-align: right; }
+  .rec-fila { grid-template-columns: 44px 1fr auto; }
+  .chart-wrap { position: relative; height: 320px; }
+  .dos-col { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 20px; }
+  @media (max-width: 1099.98px) { .dos-col { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hero">
+  <div class="stat"><div class="stat-label">Egresos del mes</div><div class="stat-value" data-monto="{{ egresos }}"></div>
+    <div class="stat-foot">{% if var_egresos is not None %}<span class="var {% if var_egresos > 0 %}sube{% else %}baja{% endif %}"><i class="bi bi-arrow-{% if var_egresos > 0 %}up{% else %}down{% endif %}"></i> {{ var_egresos|stringformat:'d'|cut:'-' }} %</span> vs mes anterior (<span data-monto="{{ egresos_anterior }}"></span>){% else %}Sin datos del mes anterior{% endif %}</div></div>
+  <div class="stat"><div class="stat-label">Gastos</div><div class="stat-value" data-monto="{{ gastos }}"></div><div class="stat-foot">insumos, servicios, arriendo…</div></div>
+  <div class="stat"><div class="stat-label">Sueldos pagados</div><div class="stat-value" data-monto="{{ sueldos }}"></div><div class="stat-foot">sueldos, adelantos y bonos</div></div>
+  <div class="stat"><div class="stat-label">Vendido en el mes</div><div class="stat-value" data-monto="{{ vendido }}"></div><div class="stat-foot">Uniformes <span data-monto="{{ ventas.uniformes }}"></span> · Librería <span data-monto="{{ ventas.libreria }}"></span></div></div>
+  <div class="stat resultado {% if resultado >= 0 %}positivo{% else %}negativo{% endif %}"><div class="stat-label">Resultado del mes</div><div class="stat-value" data-monto="{{ resultado }}"></div><div class="stat-foot">vendido − egresos</div></div>
+</div>
+
+<div class="panel mb-4">
+  <div class="panel-header flex-wrap gap-2">
+    <div><h2 class="panel-title">Últimos 12 meses</h2><p class="panel-sub">Gastos y sueldos (barras) contra lo vendido (línea)</p></div>
+    <button type="button" class="btn btn-light-border btn-sm" id="btn-tabla"><i class="bi bi-table me-1"></i>Ver como tabla</button>
+  </div>
+  <div class="panel-body">
+    <div class="chart-wrap" id="chart-wrap"><canvas id="grafico" role="img" aria-label="Gastos, sueldos y ventas de los últimos 12 meses"></canvas></div>
+    <div class="table-responsive d-none" id="tabla-serie">
+      <table class="table-app">
+        <thead><tr><th>Mes</th><th class="num">Gastos</th><th class="num">Sueldos</th><th class="num">Egresos</th><th class="num">Vendido</th><th class="num">Resultado</th></tr></thead>
+        <tbody>{% for s in serie %}<tr><td>{{ s.mes }}</td><td class="num" data-monto="{{ s.gastos }}"></td><td class="num" data-monto="{{ s.sueldos }}"></td><td class="num" data-suma="{{ s.gastos }},{{ s.sueldos }}"></td><td class="num" data-monto="{{ s.ventas }}"></td><td class="num" data-resta="{{ s.ventas }},{{ s.gastos }},{{ s.sueldos }}"></td></tr>{% endfor %}</tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="dos-col">
+  <div class="panel">
+    <div class="panel-header"><div><h2 class="panel-title">Gastos por categoría</h2><p class="panel-sub">{{ nombre_mes }}</p></div>
+      <a href="{% url 'egresos:gastos' %}?mes={{ mes_param }}" class="btn btn-light-border btn-sm">Ver todos</a></div>
+    <div class="panel-body pt-0">
+      {% for c in por_categoria %}
+      <div class="cat-fila"><span>{{ c.categoria__nombre }}</span><div class="cat-barra" title="{{ c.pct }} %"><span style="width:{{ c.pct }}%"></span></div><span class="cat-monto"><span data-monto="{{ c.total }}"></span> <span class="text-secondary small">{{ c.pct }} %</span></span></div>
+      {% empty %}
+      <div class="empty py-4"><i class="bi bi-bag"></i><strong>Sin gastos este mes</strong><a href="{% url 'egresos:gastos' %}#nuevo">Anota el primero</a></div>
+      {% endfor %}
+      {% if por_negocio|length > 1 %}
+      <div class="mt-3 pt-2 border-top small text-secondary">Por negocio: {% for n in por_negocio %}<strong>{{ n.nombre }}</strong> <span data-monto="{{ n.total }}"></span>{% if not forloop.last %} · {% endif %}{% endfor %}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="d-flex flex-column gap-4">
+    <div class="panel">
+      <div class="panel-header"><div><h2 class="panel-title">Sueldos pendientes</h2><p class="panel-sub">Lo que falta pagar de {{ nombre_mes|lower }}</p></div>
+        <a href="{% url 'egresos:empleados' %}?mes={{ mes_param }}" class="btn btn-light-border btn-sm">Empleados</a></div>
+      <div class="panel-body pt-0">
+        {% for p in pendientes %}
+        <a href="{% url 'egresos:empleado' p.empleado.pk %}?mes={{ mes_param }}#pagos" class="cat-fila text-reset"><span class="fw-semibold">{{ p.empleado }}</span><span class="small text-secondary">{{ p.empleado.get_tipo_pago_display }}{% if p.empleado.tipo_pago == 'hora' %} · {{ p.horas|floatformat:"-2" }} h{% endif %}</span><span class="cat-monto" data-monto="{{ p.pendiente }}"></span></a>
+        {% empty %}
+        <div class="text-secondary small py-2"><i class="bi bi-check-circle me-1"></i>No hay sueldos pendientes este mes.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header"><div><h2 class="panel-title">Últimos gastos</h2></div><a href="{% url 'egresos:gastos' %}#nuevo" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Anotar gasto</a></div>
+      <div class="panel-body pt-0">
+        {% for g in recientes %}
+        <div class="cat-fila rec-fila"><span class="text-secondary small">{{ g.fecha|date:'d/m' }}</span><span><span class="fw-semibold">{{ g.descripcion }}</span> <span class="small text-secondary">· {{ g.categoria }}</span></span><span class="cat-monto" data-monto="{{ g.monto }}"></span></div>
+        {% empty %}
+        <div class="text-secondary small py-2">Aún no hay gastos este mes.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{{ serie|json_script:"serie" }}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'vendor/chartjs/chart.umd.min.js' %}"></script>
+<script>
+document.querySelectorAll('[data-monto]').forEach(el => { el.textContent = App.money(el.dataset.monto); });
+document.querySelectorAll('[data-suma]').forEach(el => { el.textContent = App.money(el.dataset.suma.split(',').reduce((a, v) => a + Number(v), 0)); });
+document.querySelectorAll('[data-resta]').forEach(el => { const [v, g, s] = el.dataset.resta.split(',').map(Number); el.textContent = App.money(v - g - s); });
+
+$('#btn-tabla').on('click', function () {
+  const verTabla = $('#tabla-serie').hasClass('d-none');
+  $('#tabla-serie').toggleClass('d-none', !verTabla);
+  $('#chart-wrap').toggleClass('d-none', verTabla);
+  $(this).html(verTabla ? '<i class="bi bi-bar-chart me-1"></i>Ver gráfico' : '<i class="bi bi-table me-1"></i>Ver como tabla');
+});
+
+/* Un solo eje en pesos: barras apiladas de gastos y sueldos, y una línea con lo vendido.
+   Colores en orden fijo (azul, naranjo, verde agua), validados para daltonismo; la tabla es la vista accesible. */
+const serie = JSON.parse(document.getElementById('serie').textContent);
+const css = getComputedStyle(document.documentElement);
+const superficie = css.getPropertyValue('--surface').trim() || '#ffffff';
+new Chart(document.getElementById('grafico'), {
+  data: {
+    labels: serie.map(s => s.mes),
+    datasets: [
+      { type: 'line', label: 'Vendido', data: serie.map(s => s.ventas), borderColor: '#2a78d6', backgroundColor: '#2a78d6',
+        borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, pointBorderColor: superficie, pointBorderWidth: 2, tension: .3, order: 0 },
+      { type: 'bar', label: 'Gastos', data: serie.map(s => s.gastos), backgroundColor: '#eb6834', stack: 'egresos',
+        borderColor: superficie, borderWidth: { top: 2 }, borderRadius: 4, borderSkipped: 'bottom', maxBarThickness: 34, order: 1 },
+      { type: 'bar', label: 'Sueldos', data: serie.map(s => s.sueldos), backgroundColor: '#1baf7a', stack: 'egresos',
+        borderColor: superficie, borderWidth: { top: 2 }, borderRadius: 4, borderSkipped: 'bottom', maxBarThickness: 34, order: 1 },
+    ],
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { position: 'top', align: 'start', labels: { usePointStyle: true, boxWidth: 8, color: css.getPropertyValue('--text-2').trim() || '#555' } },
+      tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${App.money(c.parsed.y)}`,
+        footer: items => { const g = items.filter(i => i.dataset.stack === 'egresos').reduce((a, i) => a + i.parsed.y, 0); return `Egresos: ${App.money(g)}`; } } },
+    },
+    scales: {
+      x: { stacked: true, grid: { display: false }, ticks: { color: '#6b7280' } },
+      y: { stacked: true, beginAtZero: true, grid: { color: 'rgba(0,0,0,.06)' }, border: { display: false },
+           ticks: { color: '#6b7280', callback: v => App.money(v) } },
+    },
+  },
+});
+</script>
+{% endblock %}

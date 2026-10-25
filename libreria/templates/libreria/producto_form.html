@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}{% if producto %}Editar{% else %}Nuevo{% endif %} producto{% endblock %}
+{% block page_title %}Inventario de la librería{% endblock %}
+{% block page_subtitle %}{% if producto %}Editando «{{ producto }}»{% else %}Agregar un producto{% endif %}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .barcode-preview {
+    border: 1px dashed var(--border-strong); border-radius: 12px; background: #fff;
+    min-height: 120px; display: grid; place-items: center; padding: 16px;
+  }
+  .barcode-preview svg { width: 100%; max-width: 320px; height: 100px; display: block; }
+  .barcode-preview .bp-empty { color: var(--muted); font-size: 13px; text-align: center; }
+  .barcode-preview .bp-empty i { display: block; font-size: 26px; color: var(--border-strong); margin-bottom: 4px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="form-shell" style="max-width:780px">
+  <a href="{{ volver }}" class="d-inline-flex align-items-center gap-1 mb-3 text-secondary"><i class="bi bi-arrow-left"></i> Volver</a>
+  <form method="post" class="app-form" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="volver" value="{{ volver }}">
+    <div class="panel mb-3">
+      <div class="panel-header"><div><h2 class="panel-title">Código de barras</h2><p class="panel-sub">Escanea el código que trae el producto. Si no trae, genera uno y después imprímele una etiqueta.</p></div></div>
+      <div class="panel-body">
+        {{ form.non_field_errors }}
+        <div class="d-flex gap-2 flex-wrap">
+          <div class="search-box flex-grow-1"><i class="bi bi-upc"></i>{{ form.codigo_barras }}</div>
+          <button type="button" class="btn btn-soft text-nowrap" id="btn-internet"><i class="bi bi-globe2 me-1"></i>Buscar nombre en internet</button>
+          <button type="button" class="btn btn-light-border text-nowrap" id="btn-generar"><i class="bi bi-magic me-1"></i>No trae código: generar</button>
+        </div>
+        {{ form.codigo_barras.errors }}
+        <div class="field-help" id="internet-info"></div>
+        <div class="barcode-preview mt-3" id="barcode-preview">
+          <svg id="barcode-svg"></svg>
+          <div class="bp-empty" id="barcode-empty"><i class="bi bi-upc-scan"></i>La vista previa del código aparecerá aquí</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel mb-3">
+      <div class="panel-header"><div><h2 class="panel-title">Producto</h2></div></div>
+      <div class="panel-body">
+        <div class="row g-3">
+          <div class="col-md-6"><label for="{{ form.nombre.id_for_label }}">Nombre</label>{{ form.nombre }}{{ form.nombre.errors }}</div>
+          <div class="col-md-3"><label for="{{ form.marca.id_for_label }}">Marca <span class="fw-normal text-secondary">(opcional)</span></label>{{ form.marca }}{{ form.marca.errors }}</div>
+          <div class="col-md-3"><label for="{{ form.categoria.id_for_label }}">Categoría</label>{{ form.categoria }}{{ form.categoria.errors }}
+            <div class="field-help"><a href="{% url 'libreria:categoria_nueva' %}"><i class="bi bi-plus"></i>Nueva categoría</a></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header"><div><h2 class="panel-title">Precio y stock</h2></div></div>
+      <div class="panel-body">
+        <div class="row g-3">
+          <div class="col-md-3"><label for="{{ form.precio.id_for_label }}">{{ form.precio.label }}</label>{{ form.precio }}{{ form.precio.errors }}</div>
+          <div class="col-md-3"><label for="{{ form.costo.id_for_label }}">{{ form.costo.label }}</label>{{ form.costo }}{{ form.costo.errors }}<div class="field-help" id="margen"></div></div>
+          <div class="col-md-3"><label for="{{ form.stock.id_for_label }}">{{ form.stock.label }}</label>{{ form.stock }}{{ form.stock.errors }}</div>
+          <div class="col-md-3"><label for="{{ form.stock_minimo.id_for_label }}">{{ form.stock_minimo.label }}</label>{{ form.stock_minimo }}{{ form.stock_minimo.errors }}<div class="field-help">0 = sin aviso de stock bajo</div></div>
+          <div class="col-12"><div class="form-check form-switch">{{ form.activo }}<label class="form-check-label" for="{{ form.activo.id_for_label }}">{{ form.activo.label }}</label></div></div>
+        </div>
+      </div>
+      <div class="modal-footer justify-content-between">
+        <a href="{{ volver }}" class="btn btn-light-border">Cancelar</a>
+        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>{% if producto %}Guardar cambios{% else %}Guardar producto{% endif %}</button>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'vendor/jsbarcode/JsBarcode.all.min.js' %}"></script>
+<script>
+const $codigo = $('#{{ form.codigo_barras.id_for_label }}');
+$('.app-form input:not([type=checkbox]):not([type=hidden]), .app-form select').addClass('form-control');
+$('.app-form select').removeClass('form-control').addClass('form-select');
+$('#{{ form.activo.id_for_label }}').addClass('form-check-input');
+$codigo.attr({ placeholder: 'Escanea o escribe el código', autocomplete: 'off' });
+
+function dibujar() {
+  const c = $codigo.val().trim();
+  let ok = false;
+  if (c) { try { App.renderBarcode(document.getElementById('barcode-svg'), c, { height: 60 }); ok = true; } catch (e) {} }
+  $('#barcode-svg').toggle(ok); $('#barcode-empty').toggle(!ok);
+}
+function margen() {
+  const p = Number($('#{{ form.precio.id_for_label }}').val()), c = Number($('#{{ form.costo.id_for_label }}').val());
+  $('#margen').text(p > 0 && c > 0 ? `Ganancia por unidad: ${App.money(p - c)} (${Math.round((p - c) / p * 100)} %)` : '');
+}
+async function buscarInternet(auto) {
+  const c = $codigo.val().trim();
+  if (!/^\d{8,14}$/.test(c)) { if (!auto) App.toast('Escanea primero un código de barras de fábrica', 'warning'); return; }
+  $('#internet-info').html('<span class="spinner-border spinner-border-sm me-1"></span>Buscando en internet…');
+  try {
+    const r = await $.getJSON("{% url 'libreria:buscar_internet' %}", { codigo: c });
+    if (r.encontrado) {
+      const $n = $('#{{ form.nombre.id_for_label }}'), $m = $('#{{ form.marca.id_for_label }}');
+      if (!$n.val()) $n.val(r.nombre);
+      if (!$m.val() && r.marca) $m.val(r.marca);
+      $('#internet-info').html(`<i class="bi bi-check-circle-fill text-success me-1"></i>Encontrado: «${App.esc(r.nombre)}»${r.marca ? ' · ' + App.esc(r.marca) : ''}. Revísalo y corrígelo si hace falta.`);
+    } else {
+      $('#internet-info').text('No se encontró este código en internet: escribe el nombre a mano.');
+    }
+  } catch (e) { $('#internet-info').text('No se pudo buscar (¿hay internet?). Escribe el nombre a mano.'); }
+}
+$codigo.on('input', dibujar).on('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); buscarInternet(true); $('#{{ form.nombre.id_for_label }}').focus(); } });
+$('#btn-internet').on('click', () => buscarInternet(false));
+$('#btn-generar').on('click', async () => { const r = await $.getJSON("{% url 'libreria:generar_codigo' %}"); $codigo.val(r.codigo); dibujar(); });
+$('#{{ form.precio.id_for_label }}, #{{ form.costo.id_for_label }}').on('input', margen);
+dibujar(); margen();
+{% if not producto and form.codigo_barras.value and not form.nombre.value %}buscarInternet(true);{% endif %}
+if (!$codigo.val()) $codigo.focus();
+</script>
+{% endblock %}

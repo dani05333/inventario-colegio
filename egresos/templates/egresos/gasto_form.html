@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block title %}Editar gasto{% endblock %}
+{% block page_title %}Gastos{% endblock %}
+{% block page_subtitle %}Editando «{{ gasto.descripcion }}»{% endblock %}
+
+{% block content %}
+<div class="form-shell" style="max-width:760px">
+  <a href="{% url 'egresos:gastos' %}?mes={{ gasto.fecha|date:'Y-m' }}" class="d-inline-flex align-items-center gap-1 mb-3 text-secondary"><i class="bi bi-arrow-left"></i> Volver a los gastos</a>
+  <form method="post" class="panel" novalidate>
+    {% csrf_token %}
+    <div class="panel-body">
+      {{ form.non_field_errors }}
+      <div class="row g-3">
+        {% for field in form %}
+        <div class="{% if field.name == 'descripcion' or field.name == 'notas' %}col-12{% else %}col-md-4{% endif %}">
+          <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{{ field.errors }}
+        </div>
+        {% endfor %}
+      </div>
+      <datalist id="unidades">{% for u in unidades %}<option value="{{ u }}">{% endfor %}</datalist>
+      <datalist id="proveedores">{% for p in proveedores %}<option value="{{ p }}">{% endfor %}</datalist>
+    </div>
+    <div class="modal-footer justify-content-between">
+      <a href="{% url 'egresos:gastos' %}?mes={{ gasto.fecha|date:'Y-m' }}" class="btn btn-light-border">Cancelar</a>
+      <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Guardar cambios</button>
+    </div>
+  </form>
+</div>
+<script>document.addEventListener('DOMContentLoaded', () => { const p = document.getElementById('{{ form.proveedor.id_for_label }}'); if (p) p.setAttribute('list', 'proveedores'); });</script>
+{% endblock %}

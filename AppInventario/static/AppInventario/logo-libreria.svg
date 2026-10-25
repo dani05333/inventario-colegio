@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="fondo" cx="45%" cy="40%" r="65%">
+      <stop offset="0" stop-color="#fffdf7"/>
+      <stop offset="1" stop-color="#f3ecdc"/>
+    </radialGradient>
+    <linearGradient id="oro" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f6d77a"/>
+      <stop offset=".5" stop-color="#c8932c"/>
+      <stop offset="1" stop-color="#f1cf6c"/>
+    </linearGradient>
+    <linearGradient id="hoja" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e9f3f1"/>
+    </linearGradient>
+    <linearGradient id="tapa" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#14a294"/>
+      <stop offset="1" stop-color="#0b5f59"/>
+    </linearGradient>
+  </defs>
+  <circle cx="256" cy="256" r="248" fill="url(#fondo)"/>
+  <circle cx="256" cy="256" r="236" fill="none" stroke="url(#oro)" stroke-width="12"/>
+  <path d="M120 120 C 190 60, 300 70, 380 110" fill="none" stroke="#9fd8cf" stroke-width="34" stroke-linecap="round" opacity=".45"/>
+  <!-- Cuaderno abierto -->
+  <g transform="translate(256 228)">
+    <path d="M-150 -78 C -95 -102 -35 -96 0 -66 C 35 -96 95 -102 150 -78 L 150 78 C 95 56 35 60 0 88 C -35 60 -95 56 -150 78 Z" fill="url(#tapa)"/>
+    <path d="M-136 -70 C -88 -90 -34 -84 0 -56 L 0 76 C -34 50 -88 46 -136 64 Z" fill="url(#hoja)"/>
+    <path d="M136 -70 C 88 -90 34 -84 0 -56 L 0 76 C 34 50 88 46 136 64 Z" fill="url(#hoja)"/>
+    <g stroke="#9cc9c2" stroke-width="5" stroke-linecap="round">
+      <path d="M-114 -46 C -82 -58 -46 -56 -20 -38"/><path d="M-114 -16 C -82 -28 -46 -26 -20 -8"/><path d="M-114 14 C -82 2 -46 4 -20 22"/>
+      <path d="M114 -46 C 82 -58 46 -56 20 -38"/><path d="M114 -16 C 82 -28 46 -26 20 -8"/>
+    </g>
+    <!-- Lápiz -->
+    <g transform="rotate(-38 40 10)">
+      <rect x="-10" y="-8" width="150" height="26" rx="4" fill="#f2b632"/>
+      <rect x="-10" y="-8" width="150" height="9" fill="#f7cf5f"/>
+      <rect x="128" y="-8" width="24" height="26" fill="url(#oro)"/>
+      <rect x="150" y="-8" width="22" height="26" rx="6" fill="#e58a9a"/>
+      <path d="M-10 -8 L -46 5 L -10 18 Z" fill="#f3d9a8"/>
+      <path d="M-34 1 L -46 5 L -34 9 Z" fill="#2b2b2b"/>
+    </g>
+  </g>
+  <text x="256" y="402" text-anchor="middle" font-family="'Segoe Script', 'Brush Script MT', cursive" font-size="74" fill="#13312e">Librería</text>
+  <text x="256" y="446" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="30" letter-spacing="8" fill="#0f766e">CHLOE</text>
+</svg>

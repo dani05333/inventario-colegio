@@ -95,7 +95,7 @@ def preparar_python(zip_path):
 def copiar_programa():
     app = BUILD / 'app'
     ignorar = shutil.ignore_patterns('__pycache__', '*.pyc')
-    for carpeta in ('AppInventario', 'ProyectoInventario'):
+    for carpeta in ('AppInventario', 'libreria', 'egresos', 'ProyectoInventario'):
         shutil.copytree(RAIZ / carpeta, app / carpeta, ignore=ignorar)
     for archivo in ('VERSION', 'manage.py'):
         shutil.copy2(RAIZ / archivo, app / archivo)

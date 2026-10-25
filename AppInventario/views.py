@@ -46,7 +46,7 @@ def requiere_admin(vista):
             # Que el botón «Atrás» no muestre una copia guardada cuando el acceso ya se cerró
             respuesta['Cache-Control'] = 'no-store'
             return respuesta
-        if request.path.startswith('/api/'):
+        if '/api/' in request.path:   # consultas internas (también las de librería y egresos)
             return JsonResponse({'status': 'error', 'message': 'Ingresa la clave de administrador para ver esta información.'}, status=403)
         return render(request, 'acceso_admin.html', {'siguiente': request.get_full_path()}, status=403)
     return envuelta
@@ -67,7 +67,10 @@ def abrir_acceso(request):
 @require_POST
 def cerrar_acceso(request):
     seguridad.cerrar_acceso(request)
-    return redirect('punto_de_venta')
+    volver = request.POST.get('volver') or ''   # el inicio de la sección donde se presionó «Bloquear»
+    if not url_has_allowed_host_and_scheme(volver, allowed_hosts={request.get_host()}):
+        volver = reverse('punto_de_venta')
+    return redirect(volver)
 
 
 # ---------------------------------------------------------------------------

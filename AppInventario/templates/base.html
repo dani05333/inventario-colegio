@@ -1,10 +1,10 @@
 {% load static %}<!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-seccion="{{ SECCION.clave }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Inicio{% endblock %} · Chloe Creaciones</title>
-  <link rel="icon" type="image/png" href="{% static 'AppInventario/logo.png' %}">
+  <title>{% block title %}Inicio{% endblock %} · {{ SECCION.nombre }}</title>
+  <link rel="icon" href="{% static SECCION.logo %}">
   <script>
     // Menú lateral compacto (solo íconos): lo que eligió el usuario, o automático en pantallas angostas.
     // Va aquí arriba para que la página no "salte" al cargar.
@@ -26,43 +26,19 @@
 <body>
 {% with n=request.resolver_match.url_name %}
   <aside class="app-sidebar">
-    <a href="{% url 'punto_de_venta' %}" class="brand" title="Chloe Creaciones">
-      <img class="brand-logo" src="{% static 'AppInventario/logo.png' %}" alt="Chloe Creaciones">
+    <!-- El logo es un botón: despliega los círculos para cambiar de sección -->
+    <button type="button" class="brand" id="brand-switch" aria-haspopup="true" aria-expanded="false" aria-controls="sec-switch"
+            title="Cambiar de sección: {% for s in OTRAS_SECCIONES %}{{ s.etiqueta|lower }}{% if not forloop.last %} o {% endif %}{% endfor %}">
+      <img class="brand-logo" src="{% static SECCION.logo %}" alt="{{ SECCION.nombre }}">
       <span class="brand-text">
-        <span class="brand-name d-block">Chloe Creaciones</span>
-        <span class="brand-sub">Uniformes escolares</span>
+        <span class="brand-name d-block">{{ SECCION.nombre }}</span>
+        <span class="brand-sub">{{ SECCION.sub }}</span>
       </span>
-    </a>
+      <i class="bi bi-chevron-expand brand-flecha" aria-hidden="true"></i>
+    </button>
 
     <nav class="sidebar-scroll">
-      <div class="nav-section"><span>Ventas</span></div>
-      <ul class="side-nav">
-        <li><a href="{% url 'punto_de_venta' %}" title="Punto de venta" class="{% if n == 'punto_de_venta' %}active{% endif %}"><i class="bi bi-upc-scan"></i><span>Punto de venta</span></a></li>
-        <li><a href="{% url 'historial_ventas' %}" title="Historial de ventas" class="{% if n == 'historial_ventas' or n == 'boleta' %}active{% endif %}"><i class="bi bi-receipt"></i><span>Historial de ventas</span></a></li>
-        <li><a href="{% url 'dashboard_ventas' %}" title="Análisis" class="{% if n == 'dashboard_ventas' %}active{% endif %}"><i class="bi bi-graph-up-arrow"></i><span>Análisis{% if not ACCESO_ADMIN %} <i class="bi bi-lock-fill nav-candado" title="Pide la clave de administrador"></i>{% endif %}</span></a></li>
-        {% if ACCESO_ADMIN and TIENE_CLAVE %}
-        <li>
-          <form method="post" action="{% url 'cerrar_acceso' %}" class="m-0">{% csrf_token %}
-            <button type="submit" class="nav-bloquear" title="Volver a bloquear los totales de venta, el análisis y el inventario"><i class="bi bi-lock"></i><span>Bloquear vista de ventas</span></button>
-          </form>
-        </li>
-        {% endif %}
-      </ul>
-
-      <div class="nav-section"><span>Stock</span></div>
-      <ul class="side-nav">
-        <li><a href="{% url 'ver_inventario' %}" title="Inventario" class="{% if n in 'ver_inventario crear_inventario editar_inventario eliminar_inventario carga_rapida' %}active{% endif %}"><i class="bi bi-box-seam"></i><span>Inventario{% if not ACCESO_ADMIN %} <i class="bi bi-lock-fill nav-candado" title="Pide la clave de administrador"></i>{% endif %}</span></a></li>
-        <li><a href="{% url 'etiquetas' %}" title="Etiquetas" class="{% if n == 'etiquetas' %}active{% endif %}"><i class="bi bi-upc"></i><span>Etiquetas</span></a></li>
-      </ul>
-
-      <div class="nav-section"><span>Catálogos</span></div>
-      <ul class="side-nav">
-        <li><a href="{% url 'ver_colegios' %}" title="Colegios" class="{% if n in 'ver_colegios crear_colegio editar_colegio eliminar_colegio' %}active{% endif %}"><i class="bi bi-building"></i><span>Colegios</span></a></li>
-        <li><a href="{% url 'ver_uniformes' %}" title="Uniformes" class="{% if n in 'ver_uniformes crear_uniforme editar_uniforme eliminar_uniforme' %}active{% endif %}"><i class="bi bi-person-badge"></i><span>Uniformes</span></a></li>
-        <li><a href="{% url 'ver_tallas' %}" title="Tallas" class="{% if n in 'ver_tallas crear_talla editar_tallas eliminar_tallas' %}active{% endif %}"><i class="bi bi-rulers"></i><span>Tallas</span></a></li>
-        <li><a href="{% url 'ver_colores' %}" title="Colores" class="{% if n in 'ver_colores crear_color editar_color eliminar_color' %}active{% endif %}"><i class="bi bi-palette"></i><span>Colores</span></a></li>
-        <li><a href="{% url 'ver_conjuntos' %}" title="Conjuntos" class="{% if n in 'ver_conjuntos crear_conjunto editar_conjunto eliminar_conjunto' %}active{% endif %}"><i class="bi bi-collection"></i><span>Conjuntos</span></a></li>
-      </ul>
+      {% include SECCION.menu %}
 
       <div class="nav-section"><span>Programa</span></div>
       <ul class="side-nav">
@@ -71,13 +47,34 @@
     </nav>
 
     <div class="sidebar-cta">
-      <a href="{% url 'punto_de_venta' %}" class="btn btn-primary" title="Nueva venta"><i class="bi bi-plus-lg"></i><span class="ms-1">Nueva venta</span></a>
+      {% if SECCION.clave == 'egresos' %}
+      <a href="{% url 'egresos:gastos' %}#nuevo" class="btn btn-primary" title="Anotar un gasto"><i class="bi bi-plus-lg"></i><span class="ms-1">Anotar gasto</span></a>
+      {% else %}
+      <a href="{% url SECCION.inicio %}" class="btn btn-primary" title="Nueva venta"><i class="bi bi-plus-lg"></i><span class="ms-1">Nueva venta</span></a>
+      {% endif %}
       <button type="button" class="rail-toggle" id="rail-toggle" title="Contraer / expandir menú">
         <i class="bi bi-chevron-double-left"></i><span>Contraer menú</span>
       </button>
     </div>
   </aside>
 {% endwith %}
+
+  <!-- Selector de sección: al tocar el logo, aparecen los círculos de las otras secciones -->
+  <div class="sec-switch" id="sec-switch" hidden>
+    <div class="sec-fondo" data-sec-cerrar></div>
+    <div class="sec-anclaje">
+      <button type="button" class="sec-circulo sec-actual" data-sec-cerrar title="Seguir en {{ SECCION.etiqueta|lower }}">
+        <img src="{% static SECCION.logo %}" alt="">
+        <span class="sec-nombre">{{ SECCION.etiqueta }}<small>aquí estás</small></span>
+      </button>
+      {% for s in OTRAS_SECCIONES %}
+      <a href="{% url s.inicio %}" class="sec-circulo sec-otra sec-otra-{{ forloop.counter }}" data-seccion="{{ s.clave }}">
+        <img src="{% static s.logo %}" alt="">
+        <span class="sec-nombre">{{ s.etiqueta }}<small>{{ s.sub }}</small></span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
   <div class="sidebar-backdrop" data-toggle-sidebar></div>
 
   <div class="app-main">

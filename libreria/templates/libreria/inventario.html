@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block title %}Inventario{% endblock %}
+{% block page_title %}Inventario de la librería{% endblock %}
+{% block page_subtitle %}Productos, precios y stock{% endblock %}
+{% block topbar_actions %}
+<a href="{% url 'libreria:producto_nuevo' %}" class="btn btn-light-border"><i class="bi bi-plus-lg me-1"></i>Agregar producto</a>
+<a href="{% url 'libreria:ingreso' %}" class="btn btn-primary" title="Escanea lo que llegó: suma stock y crea los productos nuevos"><i class="bi bi-upc-scan me-1"></i>Ingreso rápido</a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+  tr.inactivo td { opacity: .5; }
+  .stock-bajo { color: #b45309; font-weight: 700; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg"><div class="stat"><div class="stat-label">Productos a la venta</div><div class="stat-value">{{ resumen.productos|intcomma }}</div></div></div>
+  <div class="col-6 col-lg"><div class="stat"><div class="stat-label">Unidades en stock</div><div class="stat-value">{{ resumen.unidades|intcomma }}</div></div></div>
+  <div class="col-6 col-lg"><div class="stat"><div class="stat-label">Valor a costo</div><div class="stat-value" data-monto="{{ resumen.valor_costo }}"></div></div></div>
+  <div class="col-6 col-lg"><div class="stat"><div class="stat-label">Valor a precio de venta</div><div class="stat-value" data-monto="{{ resumen.valor_venta }}"></div></div></div>
+  <div class="col-12 col-lg"><div class="stat"><div class="stat-label">Con stock bajo</div><div class="stat-value {% if resumen.stock_bajo %}stock-bajo{% endif %}">{{ resumen.stock_bajo }}</div></div></div>
+</div>
+
+<div class="panel">
+  <div class="panel-header flex-wrap gap-2">
+    <div class="search-box flex-grow-1" style="max-width:360px">
+      <i class="bi bi-search"></i>
+      <input type="search" id="q" class="form-control" placeholder="Buscar por nombre, marca o código…" autofocus>
+    </div>
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      <select class="form-select" id="f-cat" style="width:auto">
+        <option value="">Todas las categorías</option>
+        {% for c in categorias %}<option value="{{ c.nombre }}">{{ c.nombre }}</option>{% endfor %}
+        <option value="__sin">Sin categoría</option>
+      </select>
+      <div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" id="f-bajo"><label class="form-check-label" for="f-bajo">Solo stock bajo</label></div>
+      <div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" id="f-inactivos"><label class="form-check-label" for="f-inactivos">Ver los que no se venden</label></div>
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table class="table-app" id="tabla">
+      <thead><tr><th>Producto</th><th>Código</th><th>Categoría</th><th class="num">Precio</th><th class="num">Costo</th><th class="num">Margen</th><th class="num">Stock</th><th class="text-end">Acciones</th></tr></thead>
+      <tbody>
+        {% for p in productos %}
+        <tr data-id="{{ p.id }}" data-cat="{{ p.categoria.nombre|default:'__sin' }}" data-bajo="{{ p.stock_bajo|yesno:'1,0' }}" data-activo="{{ p.activo|yesno:'1,0' }}"
+            data-q="{{ p.nombre|lower }} {{ p.marca|lower }} {{ p.codigo_barras }}" class="{% if not p.activo %}inactivo{% endif %}">
+          <td><div class="cell-strong">{{ p.nombre }}</div><div class="cell-sub">{{ p.marca|default:'' }}{% if not p.activo %} · no se vende{% endif %}</div></td>
+          <td><span class="code-pill">{{ p.codigo_barras }}</span></td>
+          <td>{{ p.categoria.nombre|default:'—' }}</td>
+          <td class="num" data-monto="{{ p.precio }}"></td>
+          <td class="num">{% if p.costo %}<span data-monto="{{ p.costo }}"></span>{% else %}<span class="text-secondary">—</span>{% endif %}</td>
+          <td class="num">{% if p.costo and p.precio %}<span class="margen" data-precio="{{ p.precio }}" data-costo="{{ p.costo }}"></span>{% else %}<span class="text-secondary">—</span>{% endif %}</td>
+          <td class="num {% if p.stock_bajo %}stock-bajo{% endif %}">{{ p.stock }}{% if p.stock_bajo %} <i class="bi bi-exclamation-triangle-fill" title="Stock bajo (avisa con {{ p.stock_minimo }} o menos)"></i>{% endif %}</td>
+          <td class="text-end text-nowrap">
+            <a href="{% url 'libreria:producto_editar' p.id %}" class="btn-icon" title="Editar"><i class="bi bi-pencil"></i></a>
+            <button class="btn-icon danger js-eliminar" title="Eliminar" data-nombre="{{ p }}"><i class="bi bi-trash3"></i></button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="empty {% if productos %}d-none{% endif %}" id="vacio"><i class="bi bi-box-seam"></i><strong>{% if productos %}No hay productos que coincidan{% else %}Aún no hay productos{% endif %}</strong>{% if not productos %}Usa el <a href="{% url 'libreria:ingreso' %}">ingreso rápido</a>: escanea los códigos y se crean solos.{% endif %}</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const CSRF = '{{ csrf_token }}';
+document.querySelectorAll('[data-monto]').forEach(el => { el.textContent = App.money(el.dataset.monto); });
+document.querySelectorAll('.margen').forEach(el => {
+  const p = Number(el.dataset.precio), c = Number(el.dataset.costo);
+  el.textContent = `${Math.round((p - c) / p * 100)} %`;
+  if (p <= c) el.classList.add('text-danger');
+});
+
+function filtrar() {
+  const palabras = $('#q').val().toLowerCase().split(/\s+/).filter(Boolean);
+  const cat = $('#f-cat').val(), bajo = $('#f-bajo').prop('checked'), inactivos = $('#f-inactivos').prop('checked');
+  let visibles = 0;
+  $('#tabla tbody tr').each(function () {
+    const d = this.dataset;
+    const ok = palabras.every(w => d.q.includes(w)) && (!cat || d.cat === cat) && (!bajo || d.bajo === '1') && (inactivos || d.activo === '1');
+    this.classList.toggle('d-none', !ok);
+    if (ok) visibles++;
+  });
+  if ({{ productos|length }}) $('#vacio').toggleClass('d-none', visibles > 0);
+}
+$('#q, #f-cat, #f-bajo, #f-inactivos').on('input change', filtrar);
+filtrar();
+
+$('.js-eliminar').on('click', function () {
+  const fila = $(this).closest('tr');
+  if (!confirm(`¿Eliminar «${this.dataset.nombre}»?\nSi ya tiene ventas, en vez de borrarlo se deja de vender (el historial queda completo).`)) return;
+  $.ajax({ url: "{% url 'libreria:producto_eliminar' 0 %}".replace('/0/', '/' + fila.data('id') + '/'), method: 'POST', headers: { 'X-CSRFToken': CSRF } })
+    .done(r => { App.toast(r.accion === 'eliminado' ? 'Producto eliminado' : 'Tenía ventas: quedó como «no se vende»', 'success'); setTimeout(() => location.reload(), 700); })
+    .fail(xhr => App.toast((xhr.responseJSON && xhr.responseJSON.message) || 'No se pudo eliminar', 'error'));
+});
+</script>
+{% endblock %}

@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block title %}Historial de ventas{% endblock %}
+{% block page_title %}Historial de ventas{% endblock %}
+{% block page_subtitle %}Boletas de la librería{% endblock %}
+
+{% block extra_head %}
+<style>
+  .totales-bloqueados { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }
+  .totales-bloqueados .tb-icono { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--primary-50); color: var(--primary); font-size: 20px; flex: none; }
+  tr.anulada td { opacity: .55; }
+  tr.anulada td.estado { opacity: 1; }
+  .mv-fila { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--border); font-size: 14px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<form method="get" class="d-flex flex-wrap gap-2 align-items-center mb-3">
+  <input type="date" name="desde" value="{{ desde|date:'Y-m-d' }}" class="form-control" style="width:auto" aria-label="Desde">
+  <span class="text-secondary">a</span>
+  <input type="date" name="hasta" value="{{ hasta|date:'Y-m-d' }}" class="form-control" style="width:auto" aria-label="Hasta">
+  <button class="btn btn-light-border"><i class="bi bi-funnel me-1"></i>Ver</button>
+</form>
+
+{% if totales %}
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3"><div class="stat"><div class="stat-label">Boletas</div><div class="stat-value">{{ totales.boletas|intcomma }}</div>{% if totales.anuladas %}<div class="stat-foot">{{ totales.anuladas }} anulada{{ totales.anuladas|pluralize }} (no cuentan)</div>{% endif %}</div></div>
+  <div class="col-6 col-lg-3"><div class="stat"><div class="stat-label">Total vendido</div><div class="stat-value" data-monto="{{ totales.total }}"></div></div></div>
+  <div class="col-6 col-lg-3"><div class="stat"><div class="stat-label">Unidades</div><div class="stat-value">{{ totales.unidades|intcomma }}</div></div></div>
+  <div class="col-6 col-lg-3"><div class="stat"><div class="stat-label">Ticket promedio</div><div class="stat-value" data-monto="{{ totales.ticket }}"></div></div></div>
+</div>
+{% if totales.mas_vendidos %}
+<div class="panel mb-3">
+  <div class="panel-header"><h2 class="panel-title">Más vendidos del período</h2></div>
+  <div class="panel-body pt-0">
+    {% for m in totales.mas_vendidos %}
+    <div class="mv-fila"><span>{{ m.producto__nombre }}{% if m.producto__marca %} <span class="text-secondary">· {{ m.producto__marca }}</span>{% endif %}</span><span><strong>{{ m.unidades }}</strong> u · <span data-monto="{{ m.total }}"></span></span></div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% else %}
+<form method="post" action="{% url 'abrir_acceso' %}" class="stat totales-bloqueados mb-3">
+  {% csrf_token %}
+  <input type="hidden" name="siguiente" value="{{ request.get_full_path }}">
+  <div class="d-flex align-items-center gap-3 flex-grow-1">
+    <span class="tb-icono"><i class="bi bi-lock-fill"></i></span>
+    <div><div class="fw-bold">Totales protegidos</div><div class="small text-secondary">Boletas, total vendido, unidades, ticket promedio y más vendidos se ven con la clave de administrador.</div></div>
+  </div>
+  <div class="d-flex gap-2">
+    <input type="password" name="clave" class="form-control" placeholder="Clave de administrador" autocomplete="off" required style="width:210px" aria-label="Clave de administrador">
+    <button type="submit" class="btn btn-primary text-nowrap"><i class="bi bi-unlock me-1"></i>Ver totales</button>
+  </div>
+</form>
+{% endif %}
+
+<div class="panel">
+  <div class="table-responsive">
+    <table class="table-app">
+      <thead><tr><th>Boleta</th><th>Fecha</th><th>Productos</th><th>Pago</th><th class="num">Total</th><th class="text-end">Acciones</th></tr></thead>
+      <tbody>
+        {% for v in ventas %}
+        <tr class="{% if v.anulada %}anulada{% endif %}" data-id="{{ v.id }}">
+          <td class="fw-bold">{{ v.folio }}</td>
+          <td>{{ v.fecha|date:'d/m/Y H:i' }}</td>
+          <td><span class="d-inline-block text-truncate" style="max-width:320px">{% for d in v.detalles.all %}{{ d.cantidad }}× {{ d.producto.nombre }}{% if not forloop.last %} · {% endif %}{% endfor %}</span></td>
+          <td>{{ v.get_metodo_pago_display }}</td>
+          <td class="num estado">{% if v.anulada %}<span class="badge-soft badge-warn" title="{{ v.motivo_anulacion }}">Anulada</span>{% else %}<span data-monto="{{ v.total }}"></span>{% endif %}</td>
+          <td class="text-end text-nowrap">
+            <button class="btn-icon js-imprimir" title="Imprimir boleta"><i class="bi bi-printer"></i></button>
+            <button class="btn-icon js-pdf" title="Descargar PDF"><i class="bi bi-download"></i></button>
+            {% if not v.anulada %}<button class="btn-icon danger js-anular" title="Anular venta"><i class="bi bi-x-octagon"></i></button>{% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6"><div class="empty py-4"><i class="bi bi-receipt"></i><strong>No hay ventas en estas fechas</strong>Cambia el rango de fechas arriba.</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Anular -->
+<div class="modal fade" id="modalAnular" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Anular boleta <span id="an-folio"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div>
+      <div class="modal-body">
+        <label class="form-label" for="an-motivo">Motivo</label>
+        <input type="text" class="form-control mb-3" id="an-motivo" maxlength="200" placeholder="Ej: el cliente devolvió el producto">
+        <div class="form-check mb-3"><input class="form-check-input" type="checkbox" id="an-stock" checked><label class="form-check-label" for="an-stock">Devolver los productos al stock</label></div>
+        <label class="form-label" for="an-clave"><i class="bi bi-shield-lock me-1"></i>Clave de administrador</label>
+        <input type="password" class="form-control" id="an-clave" autocomplete="off">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light-border" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-danger" id="an-confirmar">Anular venta</button>
+      </div>
+    </div>
+  </div>
+</div>
+{{ ventas_data|json_script:"ventas-data" }}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const CSRF = '{{ csrf_token }}';
+const ventas = JSON.parse(document.getElementById('ventas-data').textContent);
+const venta = id => { const v = ventas.find(x => x.id === id); return v && Object.assign({}, v, { fecha: new Date(v.fecha) }); };
+document.querySelectorAll('[data-monto]').forEach(el => { el.textContent = App.money(el.dataset.monto); });
+
+$('.js-imprimir').on('click', function () { App.printReceipt(venta(+$(this).closest('tr').data('id'))); });
+$('.js-pdf').on('click', async function () { const b = $(this).prop('disabled', true); await App.downloadReceipt(venta(+$(this).closest('tr').data('id'))); b.prop('disabled', false); });
+
+const modalAnular = new bootstrap.Modal('#modalAnular');
+let anularId = null;
+$('.js-anular').on('click', function () {
+  anularId = +$(this).closest('tr').data('id');
+  $('#an-folio').text(venta(anularId).folio);
+  $('#an-motivo, #an-clave').val('');
+  modalAnular.show();
+});
+$('#modalAnular').on('shown.bs.modal', () => $('#an-motivo').focus());
+$('#an-confirmar').on('click', function () {
+  const btn = $(this).prop('disabled', true);
+  $.ajax({
+    url: "{% url 'libreria:anular_venta' 0 %}".replace('/0/', '/' + anularId + '/'), method: 'POST', contentType: 'application/json', headers: { 'X-CSRFToken': CSRF },
+    data: JSON.stringify({ motivo: $('#an-motivo').val(), clave: $('#an-clave').val(), devolver_stock: $('#an-stock').prop('checked') })
+  }).done(() => { App.toast('Venta anulada', 'success'); setTimeout(() => location.reload(), 700); })
+    .fail(xhr => App.toast((xhr.responseJSON && xhr.responseJSON.message) || 'No se pudo anular', 'error', 6000))
+    .always(() => btn.prop('disabled', false));
+});
+</script>
+{% endblock %}

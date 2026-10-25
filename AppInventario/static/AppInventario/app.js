@@ -6,7 +6,8 @@ const App = (function () {
   const moneyFmt = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 });
   const numFmt = new Intl.NumberFormat('es-CL');
 
-  function money(v) { return moneyFmt.format(Math.round(Number(v) || 0)); }
+  // Acepta números o textos; las plantillas escriben los decimales con coma ("5379,31"), sin separador de miles
+  function money(v) { return moneyFmt.format(Math.round(Number(typeof v === 'string' ? v.replace(',', '.') : v) || 0)); }
   function num(v) { return numFmt.format(Number(v) || 0); }
 
   function esc(s) {
@@ -38,16 +39,25 @@ const App = (function () {
     return new Date(d).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   }
 
-  /* ---------- Datos del negocio que salen en la boleta (edítalos aquí) ---------- */
-  const NEGOCIO = {
-    nombre: 'Chloe Creaciones',
-    bajada: 'Uniformes escolares',
-    lineas: [
-      // 'RUT: 12.345.678-9',
-      // 'Av. Siempre Viva 123, Santiago',
-      // 'Tel: +56 9 1234 5678',
-    ],
-    pie: '¡Gracias por su compra!',
+  /* ---------- Datos de cada negocio que salen en la boleta (edítalos aquí) ----------
+     La venta indica de qué negocio es con venta.negocio ('uniformes' si no lo dice) */
+  const NEGOCIOS = {
+    uniformes: {
+      nombre: 'Chloe Creaciones',
+      bajada: 'Uniformes escolares',
+      lineas: [
+        // 'RUT: 12.345.678-9',
+        // 'Av. Siempre Viva 123, Santiago',
+        // 'Tel: +56 9 1234 5678',
+      ],
+      pie: '¡Gracias por su compra!',
+    },
+    libreria: {
+      nombre: 'Chloe Librería',
+      bajada: 'Librería y útiles escolares',
+      lineas: [],
+      pie: '¡Gracias por su compra!',
+    },
   };
 
   /* Rollo de la impresora de boletas (se elige en Sistema → Impresora de boletas).
@@ -158,9 +168,14 @@ const App = (function () {
      venta = { id, fecha, total, items: [{inventario_id, nombre, talla, colegio, cantidad, precio, subtotal}],
                conjuntos?: [...], recibido?, vuelto? } */
   function receiptHtml(venta) {
-    const rows = lineasBoleta(venta).map(i => `
-      <tr><td colspan="2"><strong>${esc(i.nombre)} · T. ${esc(i.talla)}</strong></td></tr>
-      <tr><td style="padding-left:2ch">${i.cantidad} x ${money(i.precio)}<br><small>${esc(i.tipo === 'conjunto' ? i.detalle : i.colegio)}</small></td><td class="r">${money(i.subtotal)}</td></tr>`).join('');
+    const NEGOCIO = NEGOCIOS[venta.negocio] || NEGOCIOS.uniformes;
+    // Uniformes: «Polerón · T. 10» y el colegio debajo. Librería: el producto y su marca debajo (sin talla)
+    const rows = lineasBoleta(venta).map(i => {
+      const detalle = i.tipo === 'conjunto' ? i.detalle : i.colegio;
+      return `
+      <tr><td colspan="2"><strong>${esc(i.nombre)}${i.talla ? ' · T. ' + esc(i.talla) : ''}</strong></td></tr>
+      <tr><td style="padding-left:2ch">${i.cantidad} x ${money(i.precio)}${detalle ? `<br><small>${esc(detalle)}</small>` : ''}</td><td class="r">${money(i.subtotal)}</td></tr>`;
+    }).join('');
     // La forma de pago no se imprime en la boleta; solo el vuelto cuando se pagó en efectivo
     const pago = venta.recibido ? `
       <tr><td>Recibido</td><td class="r">${money(venta.recibido)}</td></tr>
@@ -172,7 +187,7 @@ const App = (function () {
         <div class="center">${esc(NEGOCIO.bajada)}</div>
         ${NEGOCIO.lineas.map(l => `<div class="center">${esc(l)}</div>`).join('')}
         <hr>
-        <div><strong>Boleta N° ${esc(venta.id ?? '—')}</strong></div>
+        <div><strong>Boleta N° ${esc(venta.folio ?? venta.id ?? "—")}</strong></div>
         <div>${esc(formatDateTime(venta.fecha))}</div>
         ${venta.anulada ? `<div class="center total" style="margin-top:6px">*** VENTA ANULADA ***</div>
         <div class="center">${esc(formatDateTime(venta.fecha_anulacion))}${venta.motivo_anulacion ? ' · ' + esc(venta.motivo_anulacion) : ''}</div>` : ''}
@@ -335,7 +350,7 @@ const App = (function () {
     try {
       await html2pdf().set({
         margin: [4, margen],
-        filename: `boleta-${venta.id ?? 'venta'}.pdf`,
+        filename: `boleta-${venta.folio ?? venta.id ?? 'venta'}.pdf`,
         image: { type: 'jpeg', quality: 0.95 },
         html2canvas: { scale: 2.5, backgroundColor: '#ffffff' },
         jsPDF: { unit: 'mm', format: [ANCHO_ROLLO, Math.max(altoMm, ANCHO_ROLLO)], orientation: 'portrait' }
@@ -450,6 +465,26 @@ document.addEventListener('DOMContentLoaded', function () {
   window.addEventListener('resize', () => {
     if (leerPref() === null) root.classList.toggle('rail', window.innerWidth < 1280);
   });
+
+  // Selector de sección: el logo del menú despliega los círculos de uniformes, librería y egresos
+  const selector = document.getElementById('sec-switch');
+  const btnLogo = document.getElementById('brand-switch');
+  if (selector && btnLogo) {
+    const cerrarSelector = () => {
+      selector.classList.remove('abierto');
+      btnLogo.setAttribute('aria-expanded', 'false');
+      setTimeout(() => { if (!selector.classList.contains('abierto')) selector.hidden = true; }, 300);
+    };
+    btnLogo.addEventListener('click', () => {
+      selector.hidden = false;
+      requestAnimationFrame(() => requestAnimationFrame(() => selector.classList.add('abierto')));   // así se anima la salida
+      btnLogo.setAttribute('aria-expanded', 'true');
+      const primera = selector.querySelector('.sec-otra');
+      if (primera) setTimeout(() => primera.focus({ preventScroll: true }), 50);
+    });
+    selector.addEventListener('click', e => { if (e.target.closest('[data-sec-cerrar]')) cerrarSelector(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !selector.hidden) cerrarSelector(); });
+  }
 
   // DataTables: oculta la paginación cuando cabe todo en una página
   if (window.jQuery) {

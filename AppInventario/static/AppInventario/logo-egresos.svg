@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="fondo" cx="45%" cy="40%" r="65%">
+      <stop offset="0" stop-color="#fffdf7"/>
+      <stop offset="1" stop-color="#f5ecd9"/>
+    </radialGradient>
+    <linearGradient id="oro" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f6d77a"/>
+      <stop offset=".5" stop-color="#c8932c"/>
+      <stop offset="1" stop-color="#f1cf6c"/>
+    </linearGradient>
+    <linearGradient id="cuero" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#d97a1e"/>
+      <stop offset="1" stop-color="#92400e"/>
+    </linearGradient>
+    <linearGradient id="moneda" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fbe08a"/>
+      <stop offset="1" stop-color="#c8932c"/>
+    </linearGradient>
+  </defs>
+  <circle cx="256" cy="256" r="248" fill="url(#fondo)"/>
+  <circle cx="256" cy="256" r="236" fill="none" stroke="url(#oro)" stroke-width="12"/>
+  <path d="M120 120 C 190 60, 300 70, 380 110" fill="none" stroke="#f3c48f" stroke-width="34" stroke-linecap="round" opacity=".45"/>
+  <!-- Boleta -->
+  <g transform="rotate(-10 200 170)">
+    <path d="M150 92 H 262 V 250 L 248 240 L 234 250 L 220 240 L 206 250 L 192 240 L 178 250 L 164 240 L 150 250 Z" fill="#ffffff" stroke="#e7d8bd" stroke-width="3"/>
+    <g stroke="#d9c6a3" stroke-width="7" stroke-linecap="round"><path d="M170 124 H 240"/><path d="M170 150 H 226"/><path d="M170 176 H 240"/><path d="M170 202 H 214"/></g>
+  </g>
+  <!-- Billetera -->
+  <rect x="150" y="170" width="230" height="150" rx="26" fill="url(#cuero)"/>
+  <path d="M150 206 H 380" stroke="#7a3410" stroke-width="5" opacity=".5"/>
+  <rect x="306" y="222" width="90" height="58" rx="18" fill="#b45309"/>
+  <circle cx="336" cy="251" r="12" fill="url(#oro)"/>
+  <!-- Monedas -->
+  <g>
+    <ellipse cx="148" cy="314" rx="48" ry="16" fill="#a8761f"/>
+    <rect x="100" y="290" width="96" height="24" fill="#a8761f"/>
+    <ellipse cx="148" cy="290" rx="48" ry="16" fill="url(#moneda)"/>
+    <ellipse cx="148" cy="282" rx="48" ry="16" fill="#a8761f"/>
+    <rect x="100" y="258" width="96" height="24" fill="#a8761f"/>
+    <ellipse cx="148" cy="258" rx="48" ry="16" fill="url(#moneda)"/>
+    <text x="148" y="266" text-anchor="middle" font-family="Georgia, serif" font-weight="700" font-size="24" fill="#8a5a12">$</text>
+  </g>
+  <text x="256" y="402" text-anchor="middle" font-family="'Segoe Script', 'Brush Script MT', cursive" font-size="74" fill="#3a2410">Egresos</text>
+  <text x="256" y="446" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="30" letter-spacing="8" fill="#b45309">CHLOE</text>
+</svg>

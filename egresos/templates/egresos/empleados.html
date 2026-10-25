@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% block title %}Empleados y sueldos{% endblock %}
+{% block page_title %}Empleados y sueldos{% endblock %}
+{% block page_subtitle %}{{ nombre_mes }}: sueldo de cada uno, lo pagado y lo que falta{% endblock %}
+{% block topbar_actions %}{% include 'egresos/_mes.html' %}<a href="{% url 'egresos:empleado_nuevo' %}" class="btn btn-primary ms-2"><i class="bi bi-person-plus me-1"></i>Agregar empleado</a>{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-3">
+  <div class="col-md-4"><div class="stat"><div class="stat-label">Sueldos del mes</div><div class="stat-value" data-monto="{{ total_sueldos }}"></div><div class="stat-foot">fijos + horas trabajadas</div></div></div>
+  <div class="col-md-4"><div class="stat"><div class="stat-label">Pagado</div><div class="stat-value" data-monto="{{ total_pagado }}"></div><div class="stat-foot">incluye adelantos y bonos</div></div></div>
+  <div class="col-md-4"><div class="stat"><div class="stat-label">Falta pagar</div><div class="stat-value {% if total_pendiente %}text-danger{% endif %}" data-monto="{{ total_pendiente }}"></div></div></div>
+</div>
+
+<div class="panel">
+  <div class="table-responsive">
+    <table class="table-app">
+      <thead><tr><th>Empleado</th><th>Cómo se le paga</th><th class="num">Horas del mes</th><th class="num">Sueldo del mes</th><th class="num">Pagado</th><th class="num">Falta pagar</th><th></th></tr></thead>
+      <tbody>
+        {% for x in empleados %}
+        <tr class="{% if not x.empleado.activo %}opacity-50{% endif %}">
+          <td><a href="{% url 'egresos:empleado' x.empleado.pk %}?mes={{ mes_param }}" class="cell-strong text-reset">{{ x.empleado }}</a><div class="cell-sub">{{ x.empleado.cargo|default:'' }}{% if not x.empleado.activo %} · ya no trabaja{% endif %}</div></td>
+          <td>{% if x.empleado.tipo_pago == 'mensual' %}Fijo <span data-monto="{{ x.empleado.sueldo_mensual }}"></span>{% else %}<span data-monto="{{ x.empleado.valor_hora }}"></span> la hora{% endif %}</td>
+          <td class="num">{{ x.horas|floatformat:"-2" }}</td>
+          <td class="num" data-monto="{{ x.sueldo }}"></td>
+          <td class="num" data-monto="{{ x.pagado_total }}"></td>
+          <td class="num fw-semibold {% if x.pendiente %}text-danger{% endif %}" data-monto="{{ x.pendiente }}"></td>
+          <td class="text-end"><a href="{% url 'egresos:empleado' x.empleado.pk %}?mes={{ mes_param }}" class="btn btn-light-border btn-sm">Horas y pagos</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7"><div class="empty py-4"><i class="bi bi-people"></i><strong>Aún no hay empleados</strong><a href="{% url 'egresos:empleado_nuevo' %}">Agrega el primero</a></div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>document.addEventListener('DOMContentLoaded', () => document.querySelectorAll('[data-monto]').forEach(el => { el.textContent = App.money(el.dataset.monto); }));</script>
+{% endblock %}

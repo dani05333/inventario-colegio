@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+{% block title %}Gastos{% endblock %}
+{% block page_title %}Gastos{% endblock %}
+{% block page_subtitle %}Anota lo que se compra o paga: telas, hilos, broches, arriendo, luz…{% endblock %}
+{% block topbar_actions %}{% include 'egresos/_mes.html' %}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .g-form .form-label { font-size: 13px; margin-bottom: 4px; }
+  tr.recien td { animation: recien 2s ease; }
+  @keyframes recien { from { background: var(--primary-100); } to { background: transparent; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="panel mb-4" id="nuevo">
+  <div class="panel-header"><div><h2 class="panel-title"><i class="bi bi-plus-circle me-1"></i>Anotar un gasto</h2><p class="panel-sub">Lo obligatorio: fecha, categoría, qué se compró y el monto. Lo demás es opcional.</p></div></div>
+  <form method="post" class="panel-body g-form" novalidate>
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    <div class="row g-2">
+      <div class="col-6 col-md-2"><label class="form-label" for="{{ form.fecha.id_for_label }}">Fecha</label>{{ form.fecha }}{{ form.fecha.errors }}</div>
+      <div class="col-6 col-md-3"><label class="form-label" for="{{ form.categoria.id_for_label }}">Categoría</label>{{ form.categoria }}{{ form.categoria.errors }}</div>
+      <div class="col-md-4"><label class="form-label" for="{{ form.descripcion.id_for_label }}">{{ form.descripcion.label }}</label>{{ form.descripcion }}{{ form.descripcion.errors }}</div>
+      <div class="col-6 col-md-3"><label class="form-label" for="{{ form.monto.id_for_label }}">{{ form.monto.label }}</label>{{ form.monto }}{{ form.monto.errors }}</div>
+      <div class="col-3 col-md-1"><label class="form-label" for="{{ form.cantidad.id_for_label }}">Cantidad</label>{{ form.cantidad }}{{ form.cantidad.errors }}</div>
+      <div class="col-3 col-md-2"><label class="form-label" for="{{ form.unidad.id_for_label }}">Unidad</label>{{ form.unidad }}</div>
+      <div class="col-6 col-md-3"><label class="form-label" for="{{ form.proveedor.id_for_label }}">Proveedor</label>{{ form.proveedor }}</div>
+      <div class="col-6 col-md-2"><label class="form-label" for="{{ form.metodo_pago.id_for_label }}">{{ form.metodo_pago.label }}</label>{{ form.metodo_pago }}</div>
+      <div class="col-6 col-md-2"><label class="form-label" for="{{ form.negocio.id_for_label }}">{{ form.negocio.label }}</label>{{ form.negocio }}</div>
+      <div class="col-6 col-md-2"><label class="form-label" for="{{ form.documento.id_for_label }}">N° boleta/factura</label>{{ form.documento }}</div>
+      <div class="col-md-10"><label class="form-label" for="{{ form.notas.id_for_label }}">Notas</label>{{ form.notas }}</div>
+      <div class="col-md-2 d-flex align-items-end"><button type="submit" class="btn btn-primary w-100"><i class="bi bi-check-lg me-1"></i>Guardar</button></div>
+    </div>
+    <div class="field-help mt-2" id="precio-unidad"></div>
+    <datalist id="unidades">{% for u in unidades %}<option value="{{ u }}">{% endfor %}</datalist>
+    <datalist id="proveedores">{% for p in proveedores %}<option value="{{ p }}">{% endfor %}</datalist>
+  </form>
+</div>
+
+<div class="panel">
+  <div class="panel-header flex-wrap gap-2">
+    <div><h2 class="panel-title">Gastos de {{ nombre_mes|lower }}</h2><p class="panel-sub">Total: <strong data-monto="{{ total }}"></strong> · {{ gastos|length }} gasto{{ gastos|length|pluralize }}</p></div>
+    <form method="get" class="d-flex flex-wrap gap-2">
+      <input type="hidden" name="mes" value="{{ mes_param }}">
+      <select name="categoria" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+        <option value="">Todas las categorías</option>
+        {% for c in categorias %}<option value="{{ c.id }}" {% if f_categoria == c.id|stringformat:'d' %}selected{% endif %}>{{ c }}</option>{% endfor %}
+      </select>
+      <select name="negocio" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+        <option value="">Todos los negocios</option>
+        {% for clave, nombre in negocios %}<option value="{{ clave }}" {% if f_negocio == clave %}selected{% endif %}>{{ nombre }}</option>{% endfor %}
+      </select>
+    </form>
+  </div>
+  <div class="table-responsive">
+    <table class="table-app">
+      <thead><tr><th>Fecha</th><th>Qué se compró</th><th>Categoría</th><th>Cantidad</th><th>Proveedor</th><th>Pago</th><th class="num">Monto</th><th class="text-end"></th></tr></thead>
+      <tbody>
+        {% for g in gastos %}
+        <tr data-id="{{ g.id }}" class="{% if nuevo == g.id|stringformat:'d' %}recien{% endif %}">
+          <td class="text-nowrap">{{ g.fecha|date:'d/m/Y' }}</td>
+          <td><div class="cell-strong">{{ g.descripcion }}</div><div class="cell-sub">{{ g.get_negocio_display }}{% if g.documento %} · N° {{ g.documento }}{% endif %}{% if g.notas %} · {{ g.notas|truncatechars:50 }}{% endif %}</div></td>
+          <td>{{ g.categoria }}</td>
+          <td class="text-nowrap">{% if g.cantidad %}{{ g.cantidad|floatformat:"-2" }} {{ g.unidad }}<div class="cell-sub" data-monto-u="{{ g.precio_unitario }}" data-unidad="{{ g.unidad }}"></div>{% else %}<span class="text-secondary">—</span>{% endif %}</td>
+          <td>{{ g.proveedor|default:'—' }}</td>
+          <td>{{ g.get_metodo_pago_display }}</td>
+          <td class="num fw-semibold" data-monto="{{ g.monto }}"></td>
+          <td class="text-end text-nowrap">
+            <a href="{% url 'egresos:gasto_editar' g.id %}" class="btn-icon" title="Editar"><i class="bi bi-pencil"></i></a>
+            <button class="btn-icon js-duplicar" title="Anotar otro igual (hoy)" data-json='{"categoria":"{{ g.categoria_id }}","descripcion":"{{ g.descripcion|escapejs }}","monto":"{{ g.monto|floatformat:0 }}","cantidad":"{{ g.cantidad|default_if_none:''|floatformat:"-2" }}","unidad":"{{ g.unidad|escapejs }}","proveedor":"{{ g.proveedor|escapejs }}","metodo_pago":"{{ g.metodo_pago }}","negocio":"{{ g.negocio }}"}'><i class="bi bi-copy"></i></button>
+            <button class="btn-icon danger js-eliminar" title="Eliminar"><i class="bi bi-trash3"></i></button>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8"><div class="empty py-4"><i class="bi bi-bag"></i><strong>No hay gastos en {{ nombre_mes|lower }}</strong>Anótalos con el formulario de arriba.</div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const CSRF = '{{ csrf_token }}';
+document.querySelectorAll('[data-monto]').forEach(el => { el.textContent = App.money(el.dataset.monto); });
+// "5 metros por $25.000" → "$5.000 por metro"
+const SINGULAR = { unidades: 'unidad', metros: 'metro', 'centímetros': 'centímetro', kilos: 'kilo', gramos: 'gramo', rollos: 'rollo',
+                   conos: 'cono', paquetes: 'paquete', cajas: 'caja', docenas: 'docena', litros: 'litro' };
+const porUnidad = u => { u = (u || '').trim().toLowerCase(); return SINGULAR[u] || u || 'unidad'; };
+document.querySelectorAll('[data-monto-u]').forEach(el => { if (el.dataset.montoU) el.textContent = `${App.money(el.dataset.montoU)} por ${porUnidad(el.dataset.unidad)}`; });
+$('#{{ form.proveedor.id_for_label }}').attr('list', 'proveedores');
+
+// Precio por unidad mientras se escribe (ej: 5 metros por $25.000 → $5.000 el metro)
+function precioUnidad() {
+  const m = Number($('#{{ form.monto.id_for_label }}').val()), c = Number($('#{{ form.cantidad.id_for_label }}').val());
+  const u = $('#{{ form.unidad.id_for_label }}').val().trim();
+  $('#precio-unidad').text(m > 0 && c > 0 ? `= ${App.money(m / c)} por ${porUnidad(u)}` : '');
+}
+$('#{{ form.monto.id_for_label }}, #{{ form.cantidad.id_for_label }}, #{{ form.unidad.id_for_label }}').on('input', precioUnidad);
+precioUnidad();
+if (location.hash === '#nuevo' || {{ form.errors|yesno:'true,false' }}) $('#{{ form.descripcion.id_for_label }}').focus();
+
+$('.js-duplicar').on('click', function () {
+  const d = JSON.parse(this.dataset.json);
+  const ids = { categoria: '{{ form.categoria.id_for_label }}', descripcion: '{{ form.descripcion.id_for_label }}', monto: '{{ form.monto.id_for_label }}',
+                cantidad: '{{ form.cantidad.id_for_label }}', unidad: '{{ form.unidad.id_for_label }}', proveedor: '{{ form.proveedor.id_for_label }}',
+                metodo_pago: '{{ form.metodo_pago.id_for_label }}', negocio: '{{ form.negocio.id_for_label }}' };
+  Object.entries(ids).forEach(([k, id]) => $('#' + id).val(d[k]));
+  $('#{{ form.fecha.id_for_label }}').val(new Date().toLocaleDateString('sv-SE'));   // hoy, en formato AAAA-MM-DD
+  precioUnidad();
+  document.getElementById('nuevo').scrollIntoView({ behavior: 'smooth' });
+  $('#{{ form.monto.id_for_label }}').focus().select();
+  App.toast('Copiado al formulario: revisa el monto y guarda', 'info');
+});
+
+$('.js-eliminar').on('click', function () {
+  const fila = $(this).closest('tr');
+  if (!confirm('¿Eliminar este gasto?')) return;
+  $.ajax({ url: "{% url 'egresos:gasto_eliminar' 0 %}".replace('/0/', '/' + fila.data('id') + '/'), method: 'POST', headers: { 'X-CSRFToken': CSRF } })
+    .done(() => { App.toast('Gasto eliminado', 'success'); setTimeout(() => location.reload(), 600); })
+    .fail(() => App.toast('No se pudo eliminar', 'error'));
+});
+</script>
+{% endblock %}

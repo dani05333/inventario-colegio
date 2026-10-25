@@ -1,0 +1,327 @@
+{% extends 'base.html' %}
+{% block title %}Punto de venta{% endblock %}
+{% block page_title %}Punto de venta{% endblock %}
+{% block page_subtitle %}Escanea el código del producto o búscalo por su nombre{% endblock %}
+
+{% block extra_head %}
+<style>
+  .lpos { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 20px; align-items: start; }
+  @media (max-width: 1199.98px) { .lpos { grid-template-columns: 1fr; } }
+  .lpos-buscar { position: relative; }
+  .lpos-buscar i.bi-upc-scan { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); font-size: 22px; color: var(--primary); }
+  .lpos-buscar input { height: 58px; padding-left: 52px; font-size: 18px; border-radius: 14px; }
+  .chips { display: flex; gap: 8px; overflow-x: auto; padding: 14px 0 4px; }
+  .chip { flex: none; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); border-radius: 999px; padding: 6px 14px; font-size: 14px; font-weight: 600; }
+  .chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .lgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin-top: 12px; }
+  .lcard { position: relative; text-align: left; border: 1px solid var(--border); background: var(--surface); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 4px; min-height: 128px; transition: border-color .12s, transform .06s; }
+  .lcard:hover { border-color: var(--primary); }
+  .lcard:active { transform: scale(.98); }
+  .lcard:disabled { opacity: .5; cursor: not-allowed; }
+  .lcard .n { font-weight: 700; color: var(--text); line-height: 1.2; }
+  .lcard .m { font-size: 13px; color: var(--muted); }
+  .lcard .pie { margin-top: auto; display: flex; justify-content: space-between; align-items: end; }
+  .lcard .p { font-weight: 800; font-size: 18px; color: var(--text); }
+  .lcard .s { font-size: 12.5px; color: var(--text-2); }
+  .lcard .s.bajo { color: #b45309; font-weight: 700; }
+  .lcard .en-venta { position: absolute; top: -8px; right: -8px; min-width: 24px; height: 24px; padding: 0 6px; border-radius: 999px; background: var(--primary); color: #fff; font-size: 12px; font-weight: 700; display: grid; place-items: center; }
+  .ticket { position: sticky; top: calc(var(--topbar-h) + 20px); display: flex; flex-direction: column; height: calc(100vh - var(--topbar-h) - 46px); min-height: 460px; }
+  .ticket-items { flex: 1; overflow-y: auto; padding: 6px 16px; }
+  .titem { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; padding: 10px 0; border-bottom: 1px dashed var(--border); }
+  .titem .n { font-weight: 600; }
+  .titem .d { font-size: 12.5px; color: var(--muted); }
+  .titem .sub { font-weight: 700; text-align: right; }
+  .qty { display: inline-flex; align-items: center; gap: 4px; }
+  .qty button { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); font-weight: 700; }
+  .qty input { width: 52px; text-align: center; height: 30px; padding: 0 4px; }
+  .ticket-total { padding: 14px 16px; border-top: 1px solid var(--border); }
+  .ticket-total .t { display: flex; justify-content: space-between; align-items: baseline; font-size: 15px; }
+  .ticket-total .t strong { font-size: 30px; }
+  .metodos { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .metodo { border: 2px solid var(--border); background: var(--surface); border-radius: 12px; padding: 12px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .metodo.active { border-color: var(--primary); background: var(--primary-50); color: var(--primary); }
+  .rapidos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .success-icon { width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; margin: 4px auto 14px; background: var(--success-50); color: var(--success); font-size: 36px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="lpos">
+  <div>
+    <div class="lpos-buscar">
+      <i class="bi bi-upc-scan"></i>
+      <input type="search" id="q" class="form-control" placeholder="Escanea el código o escribe para buscar…" autocomplete="off" autofocus>
+    </div>
+    <div class="d-flex justify-content-between mt-2 small text-secondary">
+      <span id="info">Cargando productos…</span>
+      <span class="d-none d-lg-inline"><kbd class="key">F2</kbd> buscar · <kbd class="key">Enter</kbd> agregar · <kbd class="key">F9</kbd> cobrar</span>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="lgrid" id="grid"></div>
+    <div class="empty d-none" id="vacio"><i class="bi bi-box-seam"></i><strong>No hay productos que coincidan</strong>Prueba con otra palabra o revisa el código.</div>
+  </div>
+
+  <div class="panel ticket">
+    <div class="panel-header">
+      <div><h2 class="panel-title">Venta actual</h2><p class="panel-sub" id="t-resumen">Sin productos</p></div>
+      <button class="btn btn-light-border btn-sm" id="btn-vaciar"><i class="bi bi-trash3 me-1"></i>Vaciar</button>
+    </div>
+    <div class="ticket-items" id="t-items"></div>
+    <div class="ticket-total">
+      <div class="t"><span>Total</span><strong class="tabular" id="t-total">$0</strong></div>
+      <button class="btn btn-primary btn-lg w-100 mt-3" id="btn-cobrar" disabled><i class="bi bi-cash-coin me-1"></i>Cobrar <kbd class="key">F9</kbd></button>
+    </div>
+  </div>
+</div>
+
+<!-- Cobro -->
+<div class="modal fade" id="modalCobro" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Cobrar <span class="tabular" id="c-total"></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div>
+      <div class="modal-body">
+        <label class="form-label">Forma de pago</label>
+        <div class="metodos" id="metodos">
+          {% for clave, nombre in metodos_pago %}<button type="button" class="metodo{% if forloop.first %} active{% endif %}" data-metodo="{{ clave }}">{{ nombre }}</button>{% endfor %}
+        </div>
+        <div class="mt-3" id="c-efectivo">
+          <label class="form-label" for="c-recibido">Recibido</label>
+          <input type="number" min="0" class="form-control form-control-lg" id="c-recibido" placeholder="Monto que entrega el cliente">
+          <div class="rapidos" id="c-rapidos"></div>
+          <div class="d-flex justify-content-between mt-3 fs-5"><span>Vuelto</span><strong class="tabular text-success" id="c-vuelto">$0</strong></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light-border" data-bs-dismiss="modal">Volver</button>
+        <button type="button" class="btn btn-success btn-lg px-4" id="btn-confirmar"><i class="bi bi-check2-circle me-1"></i>Confirmar venta</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Venta registrada -->
+<div class="modal fade" id="modalExito" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+      <div class="modal-body text-center pt-4">
+        <div class="success-icon"><i class="bi bi-check-lg"></i></div>
+        <h5 class="fw-bold mb-1">¡Venta registrada!</h5>
+        <div class="text-secondary mb-3" id="e-folio"></div>
+        <div class="d-flex justify-content-between"><span class="text-secondary">Total</span><strong class="tabular" id="e-total"></strong></div>
+        <div class="d-flex justify-content-between d-none" id="e-vuelto-fila"><span class="text-secondary">Vuelto</span><strong class="tabular text-success" id="e-vuelto"></strong></div>
+      </div>
+      <div class="modal-footer flex-column gap-2">
+        <button class="btn btn-primary w-100" id="btn-nueva">Nueva venta <kbd class="key">Enter</kbd></button>
+        <div class="d-flex gap-2 w-100">
+          <button class="btn btn-light-border flex-fill" id="btn-imprimir"><i class="bi bi-printer me-1"></i>Imprimir</button>
+          <button class="btn btn-light-border flex-fill" id="btn-pdf"><i class="bi bi-download me-1"></i>PDF</button>
+        </div>
+        <div class="small text-secondary d-none" id="imp-sugerida"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Código no registrado -->
+<div class="modal fade" id="modalNoExiste" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+      <div class="modal-body text-center pt-4">
+        <i class="bi bi-upc-scan fs-1 text-secondary"></i>
+        <h5 class="fw-bold mt-2 mb-1">Código no registrado</h5>
+        <p class="text-secondary mb-0">El código <strong class="tabular" id="ne-codigo"></strong> no está en el inventario de la librería.</p>
+      </div>
+      <div class="modal-footer flex-column gap-2">
+        <a class="btn btn-primary w-100" id="ne-agregar"><i class="bi bi-plus-lg me-1"></i>Agregarlo al inventario</a>
+        <button type="button" class="btn btn-light-border w-100" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const CSRF = '{{ csrf_token }}';
+const CARRITO = 'libreria_carrito';
+const sinTildes = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+let productos = [], carrito = [], categoria = '', metodo = '{{ metodos_pago.0.0 }}', ultimaVenta = null;
+const $q = $('#q');
+
+function guardarCarrito() { try { localStorage.setItem(CARRITO, JSON.stringify(carrito)); } catch (e) {} }
+function leerCarrito() { try { carrito = JSON.parse(localStorage.getItem(CARRITO)) || []; } catch (e) { carrito = []; } }
+
+function cargar() {
+  return $.getJSON("{% url 'libreria:productos_json' %}").then(r => {
+    productos = r.data.map(p => ({ ...p, _q: sinTildes(`${p.nombre} ${p.marca} ${p.categoria} ${p.codigo}`) }));
+    // El carrito guardado se pone al día con el stock y precio actuales
+    carrito = carrito.filter(c => productos.some(p => p.id === c.id));
+    carrito.forEach(c => { const p = productos.find(x => x.id === c.id); Object.assign(c, { nombre: p.nombre, marca: p.marca, precio: p.precio, stock: p.stock }); c.cantidad = Math.min(c.cantidad, p.stock); });
+    carrito = carrito.filter(c => c.cantidad > 0);
+    pintarChips(); pintarGrid(); pintarTicket();
+  }).fail(() => App.toast('No se pudieron cargar los productos', 'error'));
+}
+
+function filtrados() {
+  const palabras = sinTildes($q.val()).split(/\s+/).filter(Boolean);
+  return productos.filter(p => (!categoria || p.categoria === categoria) && palabras.every(w => p._q.includes(w)));
+}
+
+function pintarChips() {
+  const cats = [...new Set(productos.map(p => p.categoria).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  $('#chips').html([`<button class="chip ${categoria ? '' : 'active'}" data-cat="">Todas</button>`]
+    .concat(cats.map(c => `<button class="chip ${c === categoria ? 'active' : ''}" data-cat="${App.esc(c)}">${App.esc(c)}</button>`)).join(''))
+    .toggleClass('d-none', !cats.length);
+}
+
+function pintarGrid() {
+  const lista = filtrados();
+  const enCarrito = Object.fromEntries(carrito.map(c => [c.id, c.cantidad]));
+  $('#grid').html(lista.slice(0, 120).map(p => {
+    const bajo = p.stock_minimo > 0 && p.stock <= p.stock_minimo;
+    return `<button type="button" class="lcard" data-id="${p.id}" ${p.stock <= 0 ? 'disabled' : ''} title="${App.esc(p.codigo)}">
+      ${enCarrito[p.id] ? `<span class="en-venta">${enCarrito[p.id]}</span>` : ''}
+      <span class="n">${App.esc(p.nombre)}</span>
+      <span class="m">${App.esc([p.marca, p.categoria].filter(Boolean).join(' · '))}</span>
+      <span class="pie"><span class="p">${App.money(p.precio)}</span><span class="s ${bajo || p.stock <= 0 ? 'bajo' : ''}">${p.stock <= 0 ? 'Agotado' : p.stock + ' disp.'}</span></span>
+    </button>`;
+  }).join(''));
+  $('#vacio').toggleClass('d-none', lista.length > 0 || !productos.length);
+  $('#info').html(productos.length
+    ? `${lista.length} producto${lista.length === 1 ? '' : 's'}${lista.length > 120 ? ' (mostrando 120, afina la búsqueda)' : ''}`
+    : 'Aún no hay productos. <a href="{% url "libreria:ingreso" %}">Agrégalos escaneando sus códigos</a>.');
+}
+
+function pintarTicket() {
+  const total = carrito.reduce((a, c) => a + c.precio * c.cantidad, 0);
+  const unidades = carrito.reduce((a, c) => a + c.cantidad, 0);
+  $('#t-items').html(carrito.length ? carrito.map(c => `
+    <div class="titem" data-id="${c.id}">
+      <div><div class="n">${App.esc(c.nombre)}</div><div class="d">${App.esc(c.marca || '')}${c.marca ? ' · ' : ''}${App.money(c.precio)} c/u</div></div>
+      <div class="sub tabular">${App.money(c.precio * c.cantidad)}</div>
+      <div class="qty"><button type="button" class="js-menos">−</button><input type="number" min="1" class="form-control js-cant" value="${c.cantidad}"><button type="button" class="js-mas">+</button></div>
+      <div class="text-end"><button type="button" class="btn-icon danger js-quitar" title="Quitar"><i class="bi bi-x-lg"></i></button></div>
+    </div>`).join('') : '<div class="empty py-5"><i class="bi bi-cart"></i><strong>La venta está vacía</strong>Escanea un código o toca un producto.</div>');
+  $('#t-total').text(App.money(total));
+  $('#t-resumen').text(unidades ? `${unidades} unidad${unidades === 1 ? '' : 'es'}` : 'Sin productos');
+  $('#btn-cobrar').prop('disabled', !carrito.length);
+  guardarCarrito();
+}
+
+function agregar(id, cantidad = 1) {
+  const p = productos.find(x => x.id === id);
+  if (!p) return;
+  const item = carrito.find(c => c.id === id);
+  const nueva = (item ? item.cantidad : 0) + cantidad;
+  if (nueva > p.stock) { App.toast(p.stock <= 0 ? `${p.nombre} está agotado` : `Solo quedan ${p.stock} de ${p.nombre}`, 'warning'); return; }
+  if (item) { item.cantidad = nueva; carrito.splice(carrito.indexOf(item), 1); carrito.unshift(item); }
+  else carrito.unshift({ id: p.id, nombre: p.nombre, marca: p.marca, precio: p.precio, stock: p.stock, cantidad });
+  pintarTicket(); pintarGrid();
+}
+
+function setCantidad(id, n) {
+  const c = carrito.find(x => x.id === id);
+  if (!c) return;
+  n = Math.floor(Number(n) || 0);
+  if (n <= 0) carrito = carrito.filter(x => x.id !== id);
+  else { if (n > c.stock) { App.toast(`Solo hay ${c.stock} en stock`, 'warning'); n = c.stock; } c.cantidad = n; }
+  pintarTicket(); pintarGrid();
+}
+
+/* Enter en el buscador: un código exacto (lo normal con la pistola) o el único resultado se agregan */
+$q.on('keydown', e => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const texto = $q.val().trim();
+  if (!texto) return;
+  const exacto = productos.find(p => p.codigo === texto);
+  if (exacto) { agregar(exacto.id); $q.val(''); pintarGrid(); return; }
+  const lista = filtrados();
+  if (lista.length === 1) { agregar(lista[0].id); $q.val(''); pintarGrid(); return; }
+  if (/^\d{6,14}$/.test(texto)) {   // parece un código de barras que no está registrado
+    $('#ne-codigo').text(texto);
+    $('#ne-agregar').attr('href', "{% url 'libreria:producto_nuevo' %}?codigo=" + encodeURIComponent(texto) + "&volver={% url 'libreria:pos' %}");
+    new bootstrap.Modal('#modalNoExiste').show();
+    $q.val(''); pintarGrid();
+  }
+});
+$q.on('input', pintarGrid);
+$('#chips').on('click', '.chip', function () { categoria = String($(this).data('cat')); pintarChips(); pintarGrid(); $q.focus(); });
+$('#grid').on('click', '.lcard', function () { agregar(Number($(this).data('id'))); $q.focus(); });
+$('#t-items').on('click', '.js-mas', function () { const id = +$(this).closest('.titem').data('id'); setCantidad(id, carrito.find(c => c.id === id).cantidad + 1); });
+$('#t-items').on('click', '.js-menos', function () { const id = +$(this).closest('.titem').data('id'); setCantidad(id, carrito.find(c => c.id === id).cantidad - 1); });
+$('#t-items').on('change', '.js-cant', function () { setCantidad(+$(this).closest('.titem').data('id'), this.value); });
+$('#t-items').on('click', '.js-quitar', function () { setCantidad(+$(this).closest('.titem').data('id'), 0); });
+$('#btn-vaciar').on('click', () => { if (carrito.length && confirm('¿Vaciar la venta actual?')) { carrito = []; pintarTicket(); pintarGrid(); } });
+
+/* ---------- Cobro ---------- */
+const modalCobro = new bootstrap.Modal('#modalCobro');
+const modalExito = new bootstrap.Modal('#modalExito');
+const totalCarrito = () => carrito.reduce((a, c) => a + c.precio * c.cantidad, 0);
+
+function pintarCobro() {
+  const total = totalCarrito();
+  $('#metodos .metodo').each((i, b) => $(b).toggleClass('active', b.dataset.metodo === metodo));
+  $('#c-efectivo').toggleClass('d-none', metodo !== 'efectivo');
+  const recibido = Number($('#c-recibido').val()) || 0;
+  $('#c-vuelto').text(recibido >= total ? App.money(recibido - total) : '—');
+}
+function abrirCobro() {
+  if (!carrito.length) return;
+  const total = totalCarrito();
+  $('#c-total').text(App.money(total));
+  $('#c-recibido').val('');
+  const sugeridos = [...new Set([total, ...[1000, 2000, 5000, 10000, 20000].map(b => Math.ceil(total / b) * b)])].filter(v => v >= total).sort((a, b) => a - b).slice(0, 5);
+  $('#c-rapidos').html(sugeridos.map(v => `<button type="button" class="btn btn-sm btn-light-border" data-monto="${v}">${App.money(v)}</button>`).join(''));
+  pintarCobro();
+  modalCobro.show();
+}
+$('#btn-cobrar').on('click', abrirCobro);
+$('#metodos').on('click', '.metodo', function () { metodo = this.dataset.metodo; pintarCobro(); });
+$('#c-recibido').on('input', pintarCobro);
+$('#c-rapidos').on('click', 'button', function () { $('#c-recibido').val($(this).data('monto')); pintarCobro(); });
+$('#modalCobro').on('shown.bs.modal', () => { if (metodo === 'efectivo') $('#c-recibido').focus(); });
+$('#modalCobro').on('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#btn-confirmar').click(); } });
+
+$('#btn-confirmar').on('click', function () {
+  const total = totalCarrito();
+  const recibido = metodo === 'efectivo' && $('#c-recibido').val() !== '' ? Number($('#c-recibido').val()) : null;
+  if (recibido !== null && recibido < total) { App.toast('El monto recibido es menor que el total', 'warning'); return; }
+  const btn = $(this).prop('disabled', true);
+  $.ajax({
+    url: "{% url 'libreria:registrar_venta' %}", method: 'POST', contentType: 'application/json', headers: { 'X-CSRFToken': CSRF },
+    data: JSON.stringify({ carrito: carrito.map(c => ({ id: c.id, cantidad: c.cantidad })), metodo_pago: metodo })
+  }).done(r => {
+    ultimaVenta = Object.assign({}, r.venta, { fecha: new Date(r.venta.fecha), recibido, vuelto: recibido !== null ? recibido - r.venta.total : null });
+    carrito = []; pintarTicket();
+    modalCobro.hide();
+    $('#e-folio').text(`Boleta N° ${r.venta.folio}`);
+    $('#e-total').text(App.money(r.venta.total));
+    $('#e-vuelto-fila').toggleClass('d-none', recibido === null);
+    if (recibido !== null) $('#e-vuelto').text(App.money(recibido - r.venta.total));
+    modalExito.show();
+    cargar();
+  }).fail(xhr => App.toast((xhr.responseJSON && xhr.responseJSON.message) || 'No se pudo registrar la venta', 'error', 6000))
+    .always(() => btn.prop('disabled', false));
+});
+$('#modalExito').on('shown.bs.modal', () => $('#btn-nueva').focus());
+$('#btn-nueva').on('click', () => { modalExito.hide(); $q.focus(); });
+$('#btn-imprimir').on('click', () => { if (ultimaVenta) App.printReceipt(ultimaVenta); });
+$('#btn-pdf').on('click', async function () {
+  if (!ultimaVenta) return;
+  const btn = $(this).prop('disabled', true);
+  await App.downloadReceipt(ultimaVenta);
+  btn.prop('disabled', false);
+});
+App.nombreImpresora().then(n => { if (n) $('#imp-sugerida').html(`<i class="bi bi-printer me-1"></i>Al imprimir, elige <strong>${App.esc(n)}</strong>`).removeClass('d-none'); });
+
+/* Atajos de teclado */
+document.addEventListener('keydown', e => {
+  if (e.key === 'F2') { e.preventDefault(); $q.focus().select(); }
+  if (e.key === 'F9') { e.preventDefault(); if (!$('.modal.show').length) abrirCobro(); }
+});
+
+leerCarrito();
+cargar();
+</script>
+{% endblock %}

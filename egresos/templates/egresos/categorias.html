@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block title %}Categorías de gasto{% endblock %}
+{% block page_title %}Categorías de gasto{% endblock %}
+{% block page_subtitle %}Para agrupar los gastos y ver en qué se va la plata{% endblock %}
+
+{% block content %}
+{% url 'egresos:categoria_nueva' as crear_url %}{% url 'egresos:categoria_editar' 0 as editar_url0 %}{% url 'egresos:categoria_eliminar' 0 as eliminar_url0 %}{% url 'egresos:categorias_json' as json_url %}
+{% include 'partials/catalogo.html' with singular='Categoría' plural='Categorías' ayuda='Por ejemplo: telas, hilos, broches, arriendo, luz y agua.' %}
+{% endblock %}
