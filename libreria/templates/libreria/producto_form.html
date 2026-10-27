@@ -60,6 +60,7 @@
           <div class="col-md-3"><label for="{{ form.costo.id_for_label }}">{{ form.costo.label }}</label>{{ form.costo }}{{ form.costo.errors }}<div class="field-help" id="margen"></div></div>
           <div class="col-md-3"><label for="{{ form.stock.id_for_label }}">{{ form.stock.label }}</label>{{ form.stock }}{{ form.stock.errors }}</div>
           <div class="col-md-3"><label for="{{ form.stock_minimo.id_for_label }}">{{ form.stock_minimo.label }}</label>{{ form.stock_minimo }}{{ form.stock_minimo.errors }}<div class="field-help">0 = sin aviso de stock bajo</div></div>
+          <div class="col-12" id="precios-internet"></div>
           <div class="col-12"><div class="form-check form-switch">{{ form.activo }}<label class="form-check-label" for="{{ form.activo.id_for_label }}">{{ form.activo.label }}</label></div></div>
         </div>
       </div>
@@ -111,6 +112,13 @@ $codigo.on('input', dibujar).on('keydown', e => { if (e.key === 'Enter') { e.pre
 $('#btn-internet').on('click', () => buscarInternet(false));
 $('#btn-generar').on('click', async () => { const r = await $.getJSON("{% url 'libreria:generar_codigo' %}"); $codigo.val(r.codigo); dibujar(); });
 $('#{{ form.precio.id_for_label }}, #{{ form.costo.id_for_label }}').on('input', margen);
+// A cuánto se vende en internet (con el nombre y la marca, o con el código si aún no hay nombre)
+function preciosInternet() {
+  const texto = [$('#{{ form.nombre.id_for_label }}').val(), $('#{{ form.marca.id_for_label }}').val()].filter(Boolean).join(' ') || $codigo.val();
+  $('#precios-internet').html(App.enlacesPrecio(texto));
+}
+$('#{{ form.nombre.id_for_label }}, #{{ form.marca.id_for_label }}, #{{ form.codigo_barras.id_for_label }}').on('change', preciosInternet);
+preciosInternet();
 dibujar(); margen();
 {% if not producto and form.codigo_barras.value and not form.nombre.value %}buscarInternet(true);{% endif %}
 if (!$codigo.val()) $codigo.focus();

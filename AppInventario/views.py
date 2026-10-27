@@ -485,6 +485,74 @@ def carga_rapida(request):
     return render(request, 'carga_rapida.html')
 
 
+# ---------------------------------------------------------------------------
+# Ingreso por código: se escanea el código que ya trae el producto (calcetines, accesorios…)
+# ---------------------------------------------------------------------------
+
+# Para lo que no es de un colegio ni tiene tallas (ej. calcetines): se crean solos la primera vez
+COLEGIO_GENERAL = 'General'
+TALLA_UNICA = 'Única'
+
+
+def _por_nombre(modelo, nombre, que):
+    """El registro con ese nombre (sin importar mayúsculas ni espacios), o uno nuevo."""
+    nombre = normalizar_nombre(nombre)
+    if not nombre:
+        raise CargaError(f'Falta {que}.')
+    return next((o for o in modelo.objects.all() if normalizar_nombre(o.nombre).casefold() == nombre.casefold()), None) \
+        or modelo.objects.create(nombre=nombre)
+
+
+@requiere_admin
+def ingreso_codigo(request):
+    return render(request, 'ingreso_codigo.html', {'colegio_general': COLEGIO_GENERAL, 'talla_unica': TALLA_UNICA})
+
+
+@require_POST
+@requiere_admin
+def ingreso_codigo_guardar(request):
+    """Suma stock a los productos escaneados que ya existen y crea los nuevos con el código que traen.
+    Todo o nada."""
+    try:
+        datos = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return _error('Datos no válidos.')
+    existentes, nuevos = datos.get('existentes') or [], datos.get('nuevos') or []
+    if not isinstance(existentes, list) or not isinstance(nuevos, list) or not (existentes or nuevos):
+        return _error('No hay nada que guardar.')
+    try:
+        with transaction.atomic():
+            sumados, creados = [], []
+            for fila in existentes:
+                p = Inventario.objects.select_for_update().select_related('uniforme', 'talla', 'colegio', 'color').filter(pk=fila.get('id')).first()
+                if not p:
+                    raise CargaError('Uno de los productos ya no existe. Recarga la página.')
+                n = _numero(fila.get('cantidad'), 'la cantidad', p.talla)
+                if fila.get('precio') not in (None, ''):
+                    p.precio = _numero(fila.get('precio'), 'el precio', p.talla)
+                p.cantidad += n
+                p.save(update_fields=['cantidad', 'precio'])
+                sumados.append({'id': p.pk, 'nombre': str(p), 'cantidad': n})
+            for fila in nuevos:
+                uniforme = _por_nombre(Uniforme, fila.get('uniforme'), 'el nombre del producto')
+                colegio = _por_nombre(Colegio, fila.get('colegio') or COLEGIO_GENERAL, 'el colegio')
+                talla = _por_nombre(Talla, fila.get('talla') or TALLA_UNICA, 'la talla')
+                color = Color.objects.filter(pk=fila.get('color_id')).first() if fila.get('color_id') else None
+                codigo = (fila.get('codigo') or '').strip() or generar_codigos(1)[0]
+                if Inventario.objects.filter(codigo_barras=codigo).exists():
+                    raise CargaError(f'Ya existe un producto con el código {codigo}.')
+                repetido = Inventario.objects.filter(uniforme=uniforme, colegio=colegio, talla=talla, color=color).first()
+                if repetido:
+                    raise CargaError(f'Ya existe «{repetido}» (código {repetido.codigo_barras}): escanea ese código para sumarle stock.')
+                p = Inventario.objects.create(uniforme=uniforme, colegio=colegio, talla=talla, color=color, codigo_barras=codigo,
+                                              cantidad=_numero(fila.get('cantidad'), 'la cantidad', talla),
+                                              precio=_numero(fila.get('precio'), 'el precio', talla))
+                creados.append({'id': p.pk, 'nombre': str(p), 'codigo': p.codigo_barras, 'cantidad': p.cantidad})
+    except CargaError as e:
+        return _error(str(e))
+    return JsonResponse({'status': 'success', 'sumados': sumados, 'creados': creados})
+
+
 def etiquetas(request):
     return render(request, 'etiquetas.html')
 

@@ -8,7 +8,7 @@
 
       <div class="nav-section"><span>Stock</span></div>
       <ul class="side-nav">
-        <li><a href="{% url 'ver_inventario' %}" title="Inventario" class="{% if n in 'ver_inventario crear_inventario editar_inventario eliminar_inventario carga_rapida' %}active{% endif %}"><i class="bi bi-box-seam"></i><span>Inventario{% if not ACCESO_ADMIN %} <i class="bi bi-lock-fill nav-candado" title="Pide la clave de administrador"></i>{% endif %}</span></a></li>
+        <li><a href="{% url 'ver_inventario' %}" title="Inventario" class="{% if n in 'ver_inventario crear_inventario editar_inventario eliminar_inventario carga_rapida ingreso_codigo' %}active{% endif %}"><i class="bi bi-box-seam"></i><span>Inventario{% if not ACCESO_ADMIN %} <i class="bi bi-lock-fill nav-candado" title="Pide la clave de administrador"></i>{% endif %}</span></a></li>
         <li><a href="{% url 'etiquetas' %}" title="Etiquetas" class="{% if n == 'etiquetas' %}active{% endif %}"><i class="bi bi-upc"></i><span>Etiquetas</span></a></li>
       </ul>
 

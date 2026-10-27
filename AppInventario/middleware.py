@@ -4,7 +4,7 @@ from . import seguridad
 # Se nombran como 'nombre' (uniformes) o 'seccion:nombre' (librería); la sección de egresos entera pide la clave.
 PROTEGIDAS = {
     'historial_ventas', 'boleta', 'dashboard_ventas',
-    'ver_inventario', 'crear_inventario', 'editar_inventario', 'eliminar_inventario', 'carga_rapida',
+    'ver_inventario', 'crear_inventario', 'editar_inventario', 'eliminar_inventario', 'carga_rapida', 'ingreso_codigo',
     'libreria:historial', 'libreria:inventario', 'libreria:producto_nuevo', 'libreria:producto_editar',
     'libreria:producto_eliminar', 'libreria:ingreso',
     'arriendos:inventario', 'arriendos:pieza_nueva', 'arriendos:pieza_editar', 'arriendos:traje_nuevo', 'arriendos:traje_editar',

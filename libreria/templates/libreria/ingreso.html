@@ -52,6 +52,7 @@
           <div class="col-6 col-md-2"><label class="form-label small mb-1" for="nv-cantidad">Cantidad</label><input type="number" min="0" class="form-control" id="nv-cantidad" value="1"></div>
           <div class="col-6 col-md-2"><label class="form-label small mb-1" for="nv-minimo">Avisar con</label><input type="number" min="0" class="form-control" id="nv-minimo" value="0" title="Avisa stock bajo cuando queden esta cantidad o menos (0 = sin aviso)"></div>
           <div class="col-md-4 d-flex align-items-end"><button type="button" class="btn btn-primary w-100" id="nv-agregar"><i class="bi bi-plus-lg me-1"></i>Agregar a la lista <kbd class="key">Enter</kbd></button></div>
+          <div class="col-12" id="nv-precios"></div>
         </div>
       </div>
     </div>
@@ -100,7 +101,7 @@ function pintar(flashCodigo) {
       <td><div class="qty"><button type="button" class="js-menos">−</button><input type="number" min="0" class="form-control js-cant" value="${l.cantidad}"><button type="button" class="js-mas">+</button></div></td>
       <td><input type="number" min="0" class="form-control js-costo" value="${l.costo ?? ''}" placeholder="—"></td>
       <td><input type="number" min="0" class="form-control js-precio" value="${l.precio ?? ''}"></td>
-      <td class="text-end"><button type="button" class="btn-icon danger js-quitar" title="Quitar de la lista"><i class="bi bi-x-lg"></i></button></td>
+      <td class="text-end text-nowrap">${App.enlacesPrecio([l.nombre, l.marca].filter(Boolean).join(' '), { compacto: true })}<button type="button" class="btn-icon danger js-quitar" title="Quitar de la lista"><i class="bi bi-x-lg"></i></button></td>
     </tr>`).join(''));
   const unidades = lista.reduce((a, l) => a + (l.cantidad || 0), 0);
   const nuevos = lista.filter(l => l.nuevo).length;
@@ -128,12 +129,17 @@ function escanear(codigo) {
   abrirNuevo(codigo);
 }
 
+// Botones para ver a cuánto se vende en internet (con el nombre, o con el código si aún no hay nombre)
+function preciosNuevo() { $('#nv-precios').html(App.enlacesPrecio([$('#nv-nombre').val(), $('#nv-marca').val()].filter(Boolean).join(' ') || $('#nv-codigo').val())); }
+$('#nv-nombre, #nv-marca').on('change', preciosNuevo);
+
 async function abrirNuevo(codigo) {
   $('#nuevo').removeClass('d-none');
   $('#nv-codigo').val(codigo);
   $('#nv-nombre, #nv-marca, #nv-precio, #nv-costo').val('');
   $('#nv-cantidad').val(1); $('#nv-minimo').val(0);
   $('#nv-nombre').focus();
+  preciosNuevo();
   if (!/^\d{8,14}$/.test(codigo)) { $('#nv-info').text(codigo ? 'Código no registrado.' : 'Se le generará un código interno para imprimirle una etiqueta.'); return; }
   $('#nv-info').html('<span class="spinner-border spinner-border-sm me-1"></span>Código no registrado. Buscando el nombre en internet…');
   try {
@@ -148,6 +154,7 @@ async function abrirNuevo(codigo) {
       $('#nv-info').text('Código no registrado y no encontrado en internet: escribe el nombre.');
     }
   } catch (e) { $('#nv-info').text('Código no registrado. Escribe el nombre (no se pudo buscar en internet).'); }
+  preciosNuevo();
 }
 
 function agregarNuevo() {

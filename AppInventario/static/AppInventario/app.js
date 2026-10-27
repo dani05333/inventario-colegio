@@ -393,6 +393,25 @@ const App = (function () {
     }).then(r => r.json().then(d => { if (!r.ok) throw new Error(d.message || 'No se pudo guardar'); return d; }));
   }
 
+  /* ---------- A cuánto se vende en internet ----------
+     Botones que abren la búsqueda del producto en Google Shopping y Mercado Libre (en otra ventana).
+     Sin internet no se muestran: el resto del programa sigue funcionando igual. */
+  function enlacesPrecio(texto, { compacto = false } = {}) {
+    texto = String(texto ?? '').replace(/\s+/g, ' ').trim();
+    if (!texto || !navigator.onLine) return '';
+    const q = encodeURIComponent(texto);
+    const ml = encodeURIComponent(texto.toLowerCase().replace(/ /g, '-'));
+    const google = `https://www.google.com/search?udm=28&gl=cl&hl=es-419&q=${q}`;   // pestaña «Shopping» de Google, en Chile
+    const mercado = `https://listado.mercadolibre.cl/${ml}`;
+    if (compacto) {
+      return `<a class="btn-icon" target="_blank" rel="noopener" href="${google}" title="¿A cuánto se vende? Buscar en Google"><i class="bi bi-google"></i></a>` +
+             `<a class="btn-icon" target="_blank" rel="noopener" href="${mercado}" title="¿A cuánto se vende? Buscar en Mercado Libre"><i class="bi bi-bag"></i></a>`;
+    }
+    return `<span class="d-inline-flex flex-wrap align-items-center gap-1"><span class="small text-secondary me-1"><i class="bi bi-globe2 me-1"></i>¿A cuánto se vende?</span>` +
+      `<a class="btn btn-sm btn-light-border" target="_blank" rel="noopener" href="${google}"><i class="bi bi-google me-1"></i>Google</a>` +
+      `<a class="btn btn-sm btn-light-border" target="_blank" rel="noopener" href="${mercado}"><i class="bi bi-bag me-1"></i>Mercado Libre</a></span>`;
+  }
+
   /* ---------- Códigos de barras ---------- */
   const JSBARCODE_URL = STATIC + 'vendor/jsbarcode/JsBarcode.all.min.js';
 
@@ -437,7 +456,7 @@ const App = (function () {
 
   return {
     money, num, esc, toast, formatDateTime, dtLanguage, loadScript, METODOS_PAGO,
-    receiptHtml, printReceipt, downloadReceipt, estadoImpresora, verificarImpresora, instalarDriver, nombreImpresora, compararTallas, cargarTallas, armarConjuntos, lineasBoleta,
+    receiptHtml, printReceipt, downloadReceipt, estadoImpresora, verificarImpresora, instalarDriver, nombreImpresora, compararTallas, cargarTallas, enlacesPrecio, armarConjuntos, lineasBoleta,
     JSBARCODE_URL, renderBarcode, esEan13, codigoValido
   };
 })();

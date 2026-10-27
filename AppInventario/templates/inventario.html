@@ -5,6 +5,7 @@
 {% block topbar_actions %}
 <a href="{% url 'etiquetas' %}" class="btn btn-light-border d-none d-md-inline-block"><i class="bi bi-upc me-1"></i>Etiquetas</a>
 <a href="{% url 'crear_inventario' %}" class="btn btn-light-border"><i class="bi bi-plus-lg me-1"></i>Agregar producto</a>
+<a href="{% url 'ingreso_codigo' %}" class="btn btn-light-border" title="Escanea el código que ya trae el producto (calcetines, accesorios…)"><i class="bi bi-upc-scan me-1"></i>Ingreso por código</a>
 <a href="{% url 'carga_rapida' %}" class="btn btn-primary" title="Una prenda en varias tallas de una vez, o sumar unidades"><i class="bi bi-lightning-charge me-1"></i>Carga rápida</a>
 {% endblock %}
 
